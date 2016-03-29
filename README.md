@@ -1,10 +1,8 @@
-# power-bi-embedded-integrate-report-into-web-app
-A Power BI Embedded sample that shows you how to integrate a Power BI report into your own web app
-## Running this sample
-Coming soon...
-## Deploy this sample to Azure
-Coming soon...
-## About the code
-Coming soon...
-## More information
-Coming soon...
+---
+services: power-bi-embedded
+platforms: dotnet
+author: dvana
+---
+# Power BI Embedded - Integrate a report into a web app
+
+This sample shows you how to use the Power BI Embedded API to integrate a report into a web app.

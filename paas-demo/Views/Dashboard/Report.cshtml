@@ -1,0 +1,11 @@
+﻿@model ReportViewModel
+
+@section Breadcrumbs {
+    <ol class="breadcrumb navbar-breadcrumb">
+        <li>Reports</li>
+        <li class="active">@Model.Report.Name</li>
+    </ol>
+}
+<div class="side-body padding-top">
+    @Html.PowerBIReportFor(m => m.Report, new { style = "height:85vh", powerbi_access_token = Model.AccessToken })
+</div>
