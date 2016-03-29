@@ -33,14 +33,14 @@ namespace ProvisionSample
         static string clientId = ConfigurationManager.AppSettings["clientId"];
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
 
-        static WorkspaceCollectionKeys signingKeys = null;
+        static WorkspaceCollectionKeys accessKeys = null;
         private static string workspaceId = null;
 
         static void Main(string[] args)
         {
             if (!string.IsNullOrWhiteSpace(accessKey))
             {
-                signingKeys = new WorkspaceCollectionKeys
+                accessKeys = new WorkspaceCollectionKeys
                 {
                     Key1 = accessKey
                 };
@@ -95,7 +95,7 @@ namespace ProvisionSample
                         Console.WriteLine();
 
                         await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName);
-                        signingKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
+                        accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Workspace collection created successfully");
 
@@ -141,11 +141,11 @@ namespace ProvisionSample
                         workspaceCollectionName = Console.ReadLine();
                         Console.WriteLine();
 
-                        signingKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
+                        accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("Key1: {0}", signingKeys.Key1);
+                        Console.WriteLine("Key1: {0}", accessKeys.Key1);
                         Console.WriteLine("===============================");
-                        Console.WriteLine("Key2: {0}", signingKeys.Key2);
+                        Console.WriteLine("Key2: {0}", accessKeys.Key2);
 
                         await Run();
                         break;
@@ -487,25 +487,25 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task<IPowerBIClient> CreateClient(PowerBIToken token)
         {
-            if (signingKeys == null)
+            if (accessKeys == null)
             {
-                Console.Write("Signing Key: ");
+                Console.Write("Access Key: ");
                 accessKey = Console.ReadLine();
                 Console.WriteLine();
 
-                signingKeys = new WorkspaceCollectionKeys()
+                accessKeys = new WorkspaceCollectionKeys()
                 {
                     Key1 = accessKey
                 };
             }
 
-            if (signingKeys == null)
+            if (accessKeys == null)
             {
-                signingKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
+                accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             }
 
             // Generate a JWT token used when accessing the REST APIs
-            var jwt = token.Generate(signingKeys.Key1);
+            var jwt = token.Generate(accessKeys.Key1);
 
             // Create a token credentials with "AppToken" type
             var credentials = new TokenCredentials(jwt, "AppToken");
