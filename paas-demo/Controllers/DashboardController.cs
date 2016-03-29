@@ -14,14 +14,14 @@ namespace paas_demo.Controllers
     {
         private readonly string workspaceCollection;
         private readonly string workspaceId;
-        private readonly string signingKey;
+        private readonly string accessKey;
         private readonly string apiUrl;
 
         public DashboardController()
         {
             this.workspaceCollection = ConfigurationManager.AppSettings["powerbi:WorkspaceCollection"];
             this.workspaceId = ConfigurationManager.AppSettings["powerbi:WorkspaceId"];
-            this.signingKey = ConfigurationManager.AppSettings["powerbi:SigningKey"];
+            this.accessKey = ConfigurationManager.AppSettings["powerbi:AccessKey"];
             this.apiUrl = ConfigurationManager.AppSettings["powerbi:ApiUrl"];
         }
 
@@ -36,7 +36,7 @@ namespace paas_demo.Controllers
             var devToken = PowerBIToken.CreateDevToken(this.workspaceCollection, this.workspaceId);
             using (var client = this.CreatePowerBIClient(devToken))
             {
-                var reportsResponse = client.Reports.GetReports(this.workspaceCollection, this.workspaceId.ToString());
+                var reportsResponse = client.Reports.GetReports(this.workspaceCollection, this.workspaceId);
 
                 var viewModel = new ReportsViewModel
                 {
@@ -52,14 +52,14 @@ namespace paas_demo.Controllers
             var devToken = PowerBIToken.CreateDevToken(this.workspaceCollection, this.workspaceId);
             using (var client = this.CreatePowerBIClient(devToken))
             {
-                var reportsResponse = await client.Reports.GetReportsAsync(this.workspaceCollection, this.workspaceId.ToString());
+                var reportsResponse = await client.Reports.GetReportsAsync(this.workspaceCollection, this.workspaceId);
                 var report = reportsResponse.Value.FirstOrDefault(r => r.Id == reportId);
                 var embedToken = PowerBIToken.CreateReportEmbedToken(this.workspaceCollection, this.workspaceId, report.Id);
 
                 var viewModel = new ReportViewModel
                 {
                     Report = report,
-                    AccessToken = embedToken.Generate(this.signingKey)
+                    AccessToken = embedToken.Generate(this.accessKey)
                 };
 
                 return View(viewModel);
@@ -68,7 +68,7 @@ namespace paas_demo.Controllers
 
         private IPowerBIClient CreatePowerBIClient(PowerBIToken token)
         {
-            var jwt = token.Generate(signingKey);
+            var jwt = token.Generate(accessKey);
             var credentials = new TokenCredentials(jwt, "AppToken");
             var client = new PowerBIClient(credentials)
             {
