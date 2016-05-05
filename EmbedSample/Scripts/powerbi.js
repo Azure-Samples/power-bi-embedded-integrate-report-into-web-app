@@ -8,6 +8,8 @@
     Embed.prototype = {
         init: function () {
             var embedUrl = this.getEmbedUrl();
+            var filterPaneEnabled = this.getIsFilterPaneEnabled();
+            embedUrl = embedUrl + "&filterPaneEnabled=" + filterPaneEnabled;
             var iframeHtml = '<iframe style="width:100%;height:100%;" src="' + embedUrl + '" scrolling="no" allowfullscreen="true"></iframe>';
             this.element.innerHTML = iframeHtml;
             this.iframe = this.element.childNodes[0];
@@ -28,6 +30,15 @@
 
             powerbi.utils.raiseCustomEvent(this.element, 'embed-init', initEventArgs);
             this.iframe.contentWindow.postMessage(JSON.stringify(initEventArgs.message), '*');
+        },
+        getIsFilterPaneEnabled: function() {
+            var filterPaneEnabled = this.element.getAttribute('powerbi-options-filter-pane-enabled');
+
+            if (!filterPaneEnabled) {
+                return "false";
+            }
+
+            return filterPaneEnabled;
         },
         getAccessToken: function () {
             var accessToken = this.element.getAttribute('powerbi-access-token');

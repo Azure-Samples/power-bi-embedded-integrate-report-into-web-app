@@ -7,5 +7,5 @@
     </ol>
 }
 <div class="side-body padding-top">
-    @Html.PowerBIReportFor(m => m.Report, new { style = "height:85vh", powerbi_access_token = Model.AccessToken })
+    @Html.PowerBIReportFor(m => m.Report, new { style = "height:85vh", powerbi_access_token = Model.AccessToken, powerbi_options_filter_pane_enabled = "false" })
 </div>
