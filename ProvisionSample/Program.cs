@@ -32,6 +32,7 @@ namespace ProvisionSample
         static string password = ConfigurationManager.AppSettings["password"];
         static string clientId = ConfigurationManager.AppSettings["clientId"];
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
+        static string datasetId = ConfigurationManager.AppSettings["datasetId"];
 
         static WorkspaceCollectionKeys accessKeys = null;
         private static string workspaceId = null;
@@ -71,6 +72,8 @@ namespace ProvisionSample
                 Console.WriteLine("5. Provision a new workspace in an existing workspace collection");
                 Console.WriteLine("6. Import PBIX Desktop file into an existing workspace");
                 Console.WriteLine("7. Update connection string info for an existing dataset");
+                Console.WriteLine("8. Retrieve a list of Datasets published to a workspace");
+                Console.WriteLine("9. Delete a published dataset from a workspace");
                 Console.WriteLine();
 
                 var key = Console.ReadKey(true);
@@ -228,6 +231,45 @@ namespace ProvisionSample
                         Console.WriteLine("Connection information updated successfully.");
 
                         await Run();
+                        break;
+                    case '8':
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (string.IsNullOrWhiteSpace(workspaceId))
+                        {
+                            Console.Write("Workspace ID:");
+                            workspaceId = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+
+                        await ListDatasets(workspaceCollectionName, workspaceId);
+                        break;
+                    case '9':
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (string.IsNullOrWhiteSpace(workspaceId))
+                        {
+                            Console.Write("Workspace ID:");
+                            workspaceId = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+
+                        Console.Write("Dataset ID:");
+                        datasetId = Console.ReadLine();
+                        Console.WriteLine();
+
+                        await DeleteDataset(workspaceCollectionName, workspaceId, datasetId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("Dataset deleted successfully.");
+
                         break;
                     default:
                         Console.WriteLine("Press any key to exit..");
@@ -415,6 +457,43 @@ namespace ProvisionSample
 
                     return import;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Lists the datasets that are published to a given workspace.
+        /// </summary>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
+        /// <param name="workspaceId">The target Power BI workspace id</param>
+        /// <returns></returns>
+        static async Task ListDatasets(string workspaceCollectionName, string workspaceId)
+        {
+            var devToken = PowerBIToken.CreateDevToken(workspaceCollectionName, workspaceId);
+            using (var client = await CreateClient(devToken))
+            {
+                ODataResponseListDataset response = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
+
+                foreach (Dataset d in response.Value)
+                {
+                    Console.WriteLine("{0}:  {1}", d.Name, d.Id);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes a published dataset from a given workspace.
+        /// </summary>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
+        /// <param name="workspaceId">The target Power BI workspace id</param>
+        /// <param name="datasetId">The Power BI dataset to delete</param>
+        /// <returns></returns>
+        static async Task DeleteDataset(string workspaceCollectionName, string workspaceId, string datasetId)
+        {
+            var devToken = PowerBIToken.CreateDevToken(workspaceCollectionName, workspaceId);
+            using (var client = await CreateClient(devToken))
+            {
+                await client.Datasets.DeleteDatasetByIdAsync(workspaceCollectionName, workspaceId, datasetId);
+
             }
         }
 
