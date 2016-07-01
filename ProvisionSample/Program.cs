@@ -2,8 +2,6 @@
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.PowerBI.Api.Beta;
-using Microsoft.PowerBI.Api.Beta.Models;
 using Microsoft.Rest;
 using Microsoft.Threading;
 using ApiHost.Models;
@@ -16,6 +14,8 @@ using System.Configuration;
 using System.Net;
 using System.Collections.Generic;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.PowerBI.Api.V1;
+using Microsoft.PowerBI.Api.V1.Models;
 
 namespace ProvisionSample
 {
@@ -403,9 +403,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task<Workspace> CreateWorkspace(string workspaceCollectionName)
         {
-            // Create a provision token required to create a new workspace within your collection
-            var provisionToken = PowerBIToken.CreateProvisionToken(workspaceCollectionName);
-            using (var client = await CreateClient(provisionToken))
+            using (var client = await CreateClient())
             {
                 // Create a new workspace witin the specified collection
                 return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName);
@@ -419,8 +417,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task<IEnumerable<Workspace>> GetWorkspaces(string workspaceCollectionName)
         {
-            var provisionToken = PowerBIToken.CreateProvisionToken(workspaceCollectionName);
-            using (var client = await CreateClient(provisionToken))
+            using (var client = await CreateClient())
             {
                 var response = await client.Workspaces.GetWorkspacesByCollectionNameAsync(workspaceCollectionName);
                 return response.Value;
@@ -439,9 +436,7 @@ namespace ProvisionSample
         {
             using (var fileStream = File.OpenRead(filePath))
             {
-                // Create a dev token for import
-                var devToken = PowerBIToken.CreateDevToken(workspaceCollectionName, workspaceId);
-                using (var client = await CreateClient(devToken))
+                using (var client = await CreateClient())
                 {
 
                     // Import PBIX file from the file stream
@@ -468,8 +463,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task ListDatasets(string workspaceCollectionName, string workspaceId)
         {
-            var devToken = PowerBIToken.CreateDevToken(workspaceCollectionName, workspaceId);
-            using (var client = await CreateClient(devToken))
+            using (var client = await CreateClient())
             {
                 ODataResponseListDataset response = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
 
@@ -489,8 +483,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task DeleteDataset(string workspaceCollectionName, string workspaceId, string datasetId)
         {
-            var devToken = PowerBIToken.CreateDevToken(workspaceCollectionName, workspaceId);
-            using (var client = await CreateClient(devToken))
+            using (var client = await CreateClient())
             {
                 await client.Datasets.DeleteDatasetByIdAsync(workspaceCollectionName, workspaceId, datasetId);
 
@@ -524,8 +517,7 @@ namespace ProvisionSample
             connectionString = Console.ReadLine();
             Console.WriteLine();
 
-            var devToken = PowerBIToken.CreateDevToken(workspaceCollectionName, workspaceId);
-            using (var client = await CreateClient(devToken))
+            using (var client = await CreateClient())
             {
                 // Get the newly created dataset from the previous import process
                 var datasets = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
@@ -562,9 +554,8 @@ namespace ProvisionSample
         /// <summary>
         /// Creates a new instance of the PowerBIClient with the specified token
         /// </summary>
-        /// <param name="token">A Power BI app token</param>
         /// <returns></returns>
-        static async Task<IPowerBIClient> CreateClient(PowerBIToken token)
+        static async Task<IPowerBIClient> CreateClient()
         {
             if (accessKeys == null)
             {
@@ -583,11 +574,8 @@ namespace ProvisionSample
                 accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             }
 
-            // Generate a JWT token used when accessing the REST APIs
-            var jwt = token.Generate(accessKeys.Key1);
-
-            // Create a token credentials with "AppToken" type
-            var credentials = new TokenCredentials(jwt, "AppToken");
+            // Create a token credentials with "AppKey" type
+            var credentials = new TokenCredentials(accessKeys.Key1, "AppKey");
 
             // Instantiate your Power BI client passing in the required credentials
             var client = new PowerBIClient(credentials);
