@@ -1,12 +1,12 @@
-﻿using Microsoft.Rest;
-using paas_demo.Models;
-using System;
+﻿using System;
 using System.Configuration;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Web.Mvc;
 using Microsoft.PowerBI.Api.V1;
 using Microsoft.PowerBI.Security;
+using Microsoft.Rest;
+using paas_demo.Models;
 
 namespace paas_demo.Controllers
 {
