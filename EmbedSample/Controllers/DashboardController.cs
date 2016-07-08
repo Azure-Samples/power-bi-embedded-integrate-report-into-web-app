@@ -1,12 +1,12 @@
-﻿using Microsoft.PowerBI.Api.Beta;
-using Microsoft.PowerBI.Security;
-using Microsoft.Rest;
-using paas_demo.Models;
-using System;
+﻿using System;
 using System.Configuration;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Web.Mvc;
+using Microsoft.PowerBI.Api.V1;
+using Microsoft.PowerBI.Security;
+using Microsoft.Rest;
+using paas_demo.Models;
 
 namespace paas_demo.Controllers
 {
@@ -33,8 +33,7 @@ namespace paas_demo.Controllers
         [ChildActionOnly]
         public ActionResult Reports()
         {
-            var devToken = PowerBIToken.CreateDevToken(this.workspaceCollection, this.workspaceId);
-            using (var client = this.CreatePowerBIClient(devToken))
+            using (var client = this.CreatePowerBIClient())
             {
                 var reportsResponse = client.Reports.GetReports(this.workspaceCollection, this.workspaceId);
 
@@ -49,8 +48,7 @@ namespace paas_demo.Controllers
 
         public async Task<ActionResult> Report(string reportId)
         {
-            var devToken = PowerBIToken.CreateDevToken(this.workspaceCollection, this.workspaceId);
-            using (var client = this.CreatePowerBIClient(devToken))
+            using (var client = this.CreatePowerBIClient())
             {
                 var reportsResponse = await client.Reports.GetReportsAsync(this.workspaceCollection, this.workspaceId);
                 var report = reportsResponse.Value.FirstOrDefault(r => r.Id == reportId);
@@ -66,10 +64,9 @@ namespace paas_demo.Controllers
             }
         }
 
-        private IPowerBIClient CreatePowerBIClient(PowerBIToken token)
+        private IPowerBIClient CreatePowerBIClient()
         {
-            var jwt = token.Generate(accessKey);
-            var credentials = new TokenCredentials(jwt, "AppToken");
+            var credentials = new TokenCredentials(accessKey, "AppKey");
             var client = new PowerBIClient(credentials)
             {
                 BaseUri = new Uri(apiUrl)
