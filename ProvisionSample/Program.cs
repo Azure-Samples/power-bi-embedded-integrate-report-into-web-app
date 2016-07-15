@@ -33,9 +33,9 @@ namespace ProvisionSample
         static string clientId = ConfigurationManager.AppSettings["clientId"];
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
         static string datasetId = ConfigurationManager.AppSettings["datasetId"];
+        static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
 
         static WorkspaceCollectionKeys accessKeys = null;
-        private static string workspaceId = null;
 
         static void Main(string[] args)
         {
