@@ -438,7 +438,9 @@ namespace ProvisionSample
             {
                 using (var client = await CreateClient())
                 {
-
+                    // Set request timeout to support uploading large PBIX files
+                    client.HttpClient.Timeout = TimeSpan.FromMinutes(60);
+                    
                     // Import PBIX file from the file stream
                     var import = await client.Imports.PostImportWithFileAsync(workspaceCollectionName, workspaceId, fileStream, datasetName);
 
@@ -555,7 +557,7 @@ namespace ProvisionSample
         /// Creates a new instance of the PowerBIClient with the specified token
         /// </summary>
         /// <returns></returns>
-        static async Task<IPowerBIClient> CreateClient()
+        static async Task<PowerBIClient> CreateClient()
         {
             if (accessKeys == null)
             {
