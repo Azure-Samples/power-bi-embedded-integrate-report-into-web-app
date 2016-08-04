@@ -6,7 +6,6 @@ using Microsoft.Rest;
 using Microsoft.Threading;
 using ApiHost.Models;
 using System.IO;
-using Microsoft.PowerBI.Security;
 using System.Threading;
 using Microsoft.Rest.Serialization;
 using System.Net.Http.Headers;
@@ -16,12 +15,18 @@ using System.Collections.Generic;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.PowerBI.Api.V1;
 using Microsoft.PowerBI.Api.V1.Models;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace ProvisionSample
 {
     class Program
     {
         const string version = "?api-version=2016-01-29";
+        const string armResource = "https://management.core.windows.net/";
+        static string clientId = "ea0616ba-638b-4df5-95b9-636659ae5121";
+        static Uri redirectUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
 
         static string apiEndpointUri = ConfigurationManager.AppSettings["powerBiApiEndpoint"];
         static string azureEndpointUri = ConfigurationManager.AppSettings["azureApiEndpoint"];
@@ -30,10 +35,10 @@ namespace ProvisionSample
         static string workspaceCollectionName = ConfigurationManager.AppSettings["workspaceCollectionName"];
         static string username = ConfigurationManager.AppSettings["username"];
         static string password = ConfigurationManager.AppSettings["password"];
-        static string clientId = ConfigurationManager.AppSettings["clientId"];
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
         static string datasetId = ConfigurationManager.AppSettings["datasetId"];
         static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
+        static string azureToken = null;
 
         static WorkspaceCollectionKeys accessKeys = null;
 
@@ -317,7 +322,7 @@ namespace ProvisionSample
 
                 var request = new HttpRequestMessage(HttpMethod.Put, url);
                 // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", GetAzureAccessToken());
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
                 request.Content = content;
 
                 var response = await client.SendAsync(request);
@@ -350,7 +355,7 @@ namespace ProvisionSample
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
                 // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", GetAzureAccessToken());
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
                 request.Content = new StringContent(string.Empty);
                 var response = await client.SendAsync(request);
 
@@ -382,7 +387,7 @@ namespace ProvisionSample
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", GetAzureAccessToken());
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
                 var response = await client.SendAsync(request);
 
                 if (response.StatusCode != HttpStatusCode.OK)
@@ -440,7 +445,8 @@ namespace ProvisionSample
                 {
                     // Set request timeout to support uploading large PBIX files
                     client.HttpClient.Timeout = TimeSpan.FromMinutes(60);
-                    
+                    client.HttpClient.DefaultRequestHeaders.Add("ActivityId", Guid.NewGuid().ToString());
+
                     // Import PBIX file from the file stream
                     var import = await client.Imports.PostImportWithFileAsync(workspaceCollectionName, workspaceId, fileStream, datasetName);
 
@@ -588,29 +594,65 @@ namespace ProvisionSample
             return client;
         }
 
+        static async Task<IEnumerable<string>> GetTenantIdsAsync(string commonToken)
+        {
+            using (var httpClient = new HttpClient())
+            {
+                httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + commonToken);
+                var response = await httpClient.GetStringAsync("https://management.azure.com/tenants?api-version=2016-01-29");
+                var tenantsJson = JsonConvert.DeserializeObject<JObject>(response);
+                var tenants = tenantsJson["value"] as JArray;
+
+                return tenants.Select(t => t["tenantId"].Value<string>());
+            }
+        }
+
         /// <summary>
         /// Gets an Azure access token that can be used to call into the Azure ARM apis. 
-        /// Requires configuring a Azure AD navtive applicatino which is then configured to delegated access rights to your Azure subscription resources
+        /// </summary>
+        /// <returns>A user token to access Azure ARM</returns>
+        static async Task<string> GetAzureAccessTokenAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(azureToken))
+            {
+                return azureToken;
+            }
+
+            var commonToken = GetCommonAzureAccessToken();
+            var tenantId = (await GetTenantIdsAsync(commonToken.AccessToken)).FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(tenantId))
+            {
+                throw new InvalidOperationException("Unable to get tenant id for user accout");
+            }
+
+            var authority = string.Format("https://login.windows.net/{0}/oauth2/authorize", tenantId);
+            var authContext = new AuthenticationContext(authority);
+            var result = await authContext.AcquireTokenByRefreshTokenAsync(commonToken.RefreshToken, clientId, armResource);
+
+            return (azureToken = result.AccessToken);
+
+        }
+
+        /// <summary>
+        /// Gets a user common access token to access ARM apis
         /// </summary>
         /// <returns></returns>
-        static string GetAzureAccessToken()
+        static AuthenticationResult GetCommonAzureAccessToken()
         {
-            // Follow instructions here to setup your tenants provisioning app: https://azure.microsoft.com/en-us/documentation/articles/resource-group-create-service-principal-portal/#get-access-token-in-code
-
-            var tokenCache = new TokenCache();
-            var authContext = new AuthenticationContext("https://login.windows.net/common/oauth2/authorize", tokenCache);
+            var authContext = new AuthenticationContext("https://login.windows.net/common/oauth2/authorize");
             var result = authContext.AcquireToken(
-                resource: "https://management.core.windows.net/",
+                resource: armResource,
                 clientId: clientId,
-                redirectUri: new Uri("https://login.live.com/oauth20_desktop.srf"),
-                promptBehavior: PromptBehavior.RefreshSession);
+                redirectUri: redirectUri,
+                promptBehavior: PromptBehavior.Auto);
 
             if (result == null)
             {
                 throw new InvalidOperationException("Failed to obtain the JWT token");
             }
 
-            return result.AccessToken;
+            return result;
         }
     }
 }
