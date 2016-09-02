@@ -3,9 +3,180 @@
 @section Breadcrumbs {
     <ol class="breadcrumb navbar-breadcrumb">
         <li>Reports</li>
-        <li class="active">@Model.Report.Name</li>
+        <li>@Model.Report.Name</li>
+        <li class="active" id="page-name"></li>
     </ol>
 }
 <div class="side-body padding-top">
-    @Html.PowerBIReportFor(m => m.Report, new { style = "height:85vh", powerbi_access_token = Model.AccessToken })
+    <div class="col-md-9">
+        @Html.PowerBIReportFor(m => m.Report, new { id = "pbi-report", style = "height:85vh", powerbi_access_token = Model.AccessToken })
+    </div>
+    <div class="col-md-3">
+        <h3>Page Navigation</h3>
+        <div>
+            <button id="pbi-prev-page" class="btn btn-default">Previous Page</button>
+            <button id="pbi-next-page" class="btn btn-default">Next Page</button>
+        </div>
+        <h3>Settings</h3>
+        <div>
+            <div class="checkbox">
+                <label>
+                    <input id="setting-shownav" type="checkbox" checked="checked" /> Show Navigation
+                </label>
+            </div>
+            <div class="checkbox">
+                <label>
+                    <input id="setting-showfilterpane" type="checkbox" /> Show Filter Pane
+                </label>
+            </div>
+        </div>
+        <h3>Filters</h3>
+        <button id="filter-clear" type="button" class="btn btn-danger">Clear All Filters</button>
+        <h4>Add Filter</h4>
+        <form id="filter-form">
+            <div class="form-group">
+                <label for="filter-target">Target</label>
+                <select id="filter-target" class="form-control">
+                    <option value="report">Report</option>
+                    <option value="page">Page</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="filter-table">Table</label>
+                <input type="text" class="form-control" id="filter-table" />
+            </div>
+            <div class="form-group">
+                <label for="filter-column">Column / Measure</label>
+                <input type="text" class="form-control" id="filter-column" />
+            </div>
+            <div class="form-group">
+                <label for="filter-value">Value</label>
+                <input type="text" class="form-control" id="filter-value" />
+            </div>
+            <button id="filter-add" type="button" class="btn btn-success">Add Filter</button>
+        </form>
+    </div>
 </div>
+
+@section PageScripts {
+    <script>
+        $(function () {
+            // For complete list of embed configuration see the following wiki page
+            // https://github.com/Microsoft/PowerBI-JavaScript/wiki/Embed-Configuration-Details
+            var reportConfig = {
+                settings: {
+                    filterPaneEnabled: false
+                }
+            };
+            var reportElement = document.getElementById('pbi-report');
+            var pageName = document.getElementById('page-name');
+
+            // Embed report
+            // https://microsoft.github.io/PowerBI-JavaScript/classes/_src_service_.service.html#embed
+            var report = powerbi.embed(reportElement, reportConfig);
+
+            var pages = [];
+            var pageIndex = 0;
+            var currentPage = null;
+
+            // For a complete guide to event handling see the following wiki page
+            // https://github.com/Microsoft/PowerBI-JavaScript/wiki/Handling-Events
+            report.on('loaded',
+                function () {
+                    // Get report pages
+                    // https://microsoft.github.io/PowerBI-JavaScript/classes/_src_report_.report.html#getpages
+                    report.getPages()
+                        .then(function (reportPages) {
+                            pages = reportPages;
+                        });
+                });
+
+            // Handling pageChanged event
+            // https://microsoft.github.io/PowerBI-JavaScript/classes/_src_report_.report.html#on
+            report.on('pageChanged',
+                function (e) {
+                    currentPage = e.detail.newPage;
+                    pageName.innerText = e.detail.newPage.displayName;
+
+                    if (pages.length === 0) {
+                        return;
+                    }
+
+                    pageIndex = pages.findIndex(function (el) {
+                        return el.name === e.detail.newPage.name;
+                    });
+                });
+
+            // For a complete guide to page navigation see the following wiki page
+            // https://github.com/Microsoft/PowerBI-JavaScript/wiki/Page-Navigation
+            function changePage(direction) {
+                var nextPageIndex = pageIndex + direction;
+                if (nextPageIndex < 0) nextPageIndex = pages.length - 1;
+                if (nextPageIndex >= pages.length) nextPageIndex = 0;
+
+                pages[nextPageIndex].setActive();
+            }
+
+            // For a complete guide to setting filters see the following wiki page
+            // https://github.com/Microsoft/PowerBI-JavaScript/wiki/Filters
+            function addFilter() {
+                var target = $('#filter-target').val();
+                var table = $('#filter-table').val();
+                var column = $('#filter-column').val();
+                var value = $('#filter-value').val();
+
+                var basicFilter = {
+                    $schema: "http://powerbi.com/product/schema#basic",
+                    target: {
+                        table: table,
+                        column: column
+                    },
+                    operator: 'In',
+                    values: [value]
+                };
+
+                var filterTarget = target === 'page' ? currentPage : report;
+                // Get existing filters and append a new filter
+                // https://microsoft.github.io/PowerBI-JavaScript/interfaces/_src_ifilterable_.ifilterable.html#getfilters
+                filterTarget.getFilters().then(function (allTargetFilters) {
+                    allTargetFilters.push(basicFilter);
+
+                    // Set filters
+                    // https://microsoft.github.io/PowerBI-JavaScript/interfaces/_src_ifilterable_.ifilterable.html#setfilters
+                    filterTarget.setFilters(allTargetFilters);
+                });
+
+
+                $('#filter-form')[0].reset();
+            }
+
+            function clearFilters() {
+                // Remove report filters
+                // https://microsoft.github.io/PowerBI-JavaScript/classes/_src_report_.report.html#removefilters
+                report.removeFilters();
+                pages.forEach(function (page) {
+                    // Remove page filters
+                    // https://microsoft.github.io/PowerBI-JavaScript/classes/_src_page_.page.html#removefilters
+                    page.removeFilters();
+                });
+            }
+
+            // For a full list of configurable settings see the following wiki page
+            // https://github.com/Microsoft/PowerBI-JavaScript/wiki/Settings
+            function updateSetting(e, settingName) {
+                var settings = {};
+                settings[settingName] = e.target.checked;
+                report.updateSettings(settings);
+            }
+
+            $('#pbi-prev-page').on('click', function () { changePage(-1); });
+            $('#pbi-next-page').on('click', function () { changePage(1); });
+
+            $('#setting-shownav').on('change', function (e) { updateSetting(e, 'navContentPaneEnabled'); });
+            $('#setting-showfilterpane').on('change', function (e) { updateSetting(e, 'filterPaneEnabled'); });
+
+            $('#filter-add').on('click', function () { addFilter(); });
+            $('#filter-clear').on('click', function () { clearFilters(); });
+        });
+    </script>
+}
