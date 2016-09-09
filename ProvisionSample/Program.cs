@@ -297,16 +297,27 @@ namespace ProvisionSample
                         var importId = Console.ReadLine();
                         Console.WriteLine();
 
-                        var importResult = await GetStatus(workspaceCollectionName, workspaceId, importId);
+                        var importResult = await GetImport(workspaceCollectionName, workspaceId, importId);
                         if (importResult == null)
                         {
                             Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine("Import state of {0} is not found!", datasetId);
+                            Console.WriteLine("Import state of {0} is not found.", importId);
                         }
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.WriteLine("Import state of {0} is {1}", importResult.Id, importResult.ImportState);
+                            Console.WriteLine("Name:     {0}", importResult.Name);
+                            Console.WriteLine("Id:       {0}", importResult.Id);
+                            Console.WriteLine("State:    {0}", importResult.ImportState);
+                            Console.WriteLine("DataSets: {0}", importResult.Datasets.Count);
+                            foreach (var dataset in importResult.Datasets)
+                            {
+                                Console.WriteLine("\t{0}: {1}", dataset.Name, dataset.WebUrl);
+                            }
+                            Console.WriteLine("Reports: {0}", importResult.Reports.Count);
+                            foreach (var report in importResult.Reports)
+                            {
+                                Console.WriteLine("\t{0}: {1}", report.Name, report.WebUrl);
+                            }
                         }
                         break;
 
@@ -319,7 +330,7 @@ namespace ProvisionSample
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Ooops, something broke: {0}", ex.Message);
+                Console.WriteLine("Ooops, something broke: {0}", ex);
                 Console.WriteLine();
             }
 
@@ -329,37 +340,11 @@ namespace ProvisionSample
             }
         }
 
-        static async Task<Import> GetStatus(string workspaceCollectionName, string workspaceId, string importId)
+        static async Task<Import> GetImport(string workspaceCollectionName, string workspaceId, string importId)
         {
             using (var client = await CreateClient())
             {
-                Import import;
-                try
-                {
-                    import = await client.Imports.GetImportByIdAsync(workspaceCollectionName, workspaceId, importId);
-                }
-                catch (Exception ex)
-                {
-                    // TODO Get HTTP response body?
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Exception: {0}", ex);
-                    return null;
-                }
-
-                Console.WriteLine("Name:     {0}", import.Name);
-                Console.WriteLine("Id:       {0}", import.Id);
-                Console.WriteLine("State:    {0}", import.ImportState);
-                Console.WriteLine("DataSets: {0}", import.Datasets.Count);
-                foreach (var dataset in import.Datasets)
-                {
-                    Console.WriteLine("\t {0} = {1}", dataset.Name, dataset.WebUrl);
-                }
-                Console.WriteLine("\tReports: {0}", import.Reports.Count);
-                foreach (var report in import.Reports)
-                {
-                    Console.WriteLine("\t {0} = {1}", report.Name, report.WebUrl);
-                }
-                return import;
+                return await client.Imports.GetImportByIdAsync(workspaceCollectionName, workspaceId, importId);
             }
         }
 
