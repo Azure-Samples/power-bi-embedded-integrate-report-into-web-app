@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -79,6 +79,7 @@ namespace ProvisionSample
                 Console.WriteLine("7. Update connection string info for an existing dataset");
                 Console.WriteLine("8. Retrieve a list of Datasets published to a workspace");
                 Console.WriteLine("9. Delete a published dataset from a workspace");
+                Console.WriteLine("0. Get import status of deployment");
                 Console.WriteLine();
 
                 var key = Console.ReadKey(true);
@@ -276,6 +277,39 @@ namespace ProvisionSample
                         Console.WriteLine("Dataset deleted successfully.");
 
                         break;
+
+
+                    case '0':
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (string.IsNullOrWhiteSpace(workspaceId))
+                        {
+                            Console.Write("Workspace ID:");
+                            workspaceId = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+
+                        Console.Write("Import ID:");
+                        var importId = Console.ReadLine();
+                        Console.WriteLine();
+
+                        var importResult = await GetStatus(workspaceCollectionName, workspaceId, importId);
+                        if (importResult == null)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine("Import state of {0} is not found!", datasetId);
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            Console.WriteLine("Import state of {0} is {1}", importResult.Id, importResult.ImportState);
+                        }
+                        break;
+
                     default:
                         Console.WriteLine("Press any key to exit..");
                         exit = true;
@@ -292,6 +326,40 @@ namespace ProvisionSample
             if (!exit)
             {
                 await Run();
+            }
+        }
+
+        static async Task<Import> GetStatus(string workspaceCollectionName, string workspaceId, string importId)
+        {
+            using (var client = await CreateClient())
+            {
+                Import import;
+                try
+                {
+                    import = await client.Imports.GetImportByIdAsync(workspaceCollectionName, workspaceId, importId);
+                }
+                catch (Exception ex)
+                {
+                    // TODO Get HTTP response body?
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Exception: {0}", ex);
+                    return null;
+                }
+
+                Console.WriteLine("Name:     {0}", import.Name);
+                Console.WriteLine("Id:       {0}", import.Id);
+                Console.WriteLine("State:    {0}", import.ImportState);
+                Console.WriteLine("DataSets: {0}", import.Datasets.Count);
+                foreach (var dataset in import.Datasets)
+                {
+                    Console.WriteLine("\t {0} = {1}", dataset.Name, dataset.WebUrl);
+                }
+                Console.WriteLine("\tReports: {0}", import.Reports.Count);
+                foreach (var report in import.Reports)
+                {
+                    Console.WriteLine("\t {0} = {1}", report.Name, report.WebUrl);
+                }
+                return import;
             }
         }
 
@@ -608,7 +676,7 @@ namespace ProvisionSample
         }
 
         /// <summary>
-        /// Gets an Azure access token that can be used to call into the Azure ARM apis. 
+        /// Gets an Azure access token that can be used to call into the Azure ARM apis.
         /// </summary>
         /// <returns>A user token to access Azure ARM</returns>
         static async Task<string> GetAzureAccessTokenAsync()
