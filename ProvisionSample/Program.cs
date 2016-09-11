@@ -79,7 +79,7 @@ namespace ProvisionSample
                 Console.WriteLine("7. Update connection string info for an existing dataset");
                 Console.WriteLine("8. Retrieve a list of Datasets published to a workspace");
                 Console.WriteLine("9. Delete a published dataset from a workspace");
-                Console.WriteLine("0. Get import status of deployment");
+                Console.WriteLine("0. Get status of import");
                 Console.WriteLine();
 
                 var key = Console.ReadKey(true);
