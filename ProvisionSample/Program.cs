@@ -319,7 +319,6 @@ namespace ProvisionSample
                                 Console.WriteLine("\t{0}: {1}", report.Name, report.WebUrl);
                             }
                         }
-                        break;
 
                     default:
                         Console.WriteLine("Press any key to exit..");
