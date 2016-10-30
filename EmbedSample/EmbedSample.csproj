@@ -214,7 +214,7 @@
     <Content Include="lib\js\bootstrap.min.js" />
     <Content Include="lib\js\Chart.min.js" />
     <Content Include="lib\js\dataTables.bootstrap.min.js" />
-	<Content Include="lib\js\es6-promise.auto.min.js" />
+    <Content Include="lib\js\es6-promise.auto.min.js" />
     <Content Include="lib\js\jquery.dataTables.min.js" />
     <Content Include="lib\js\jquery.matchHeight-min.js" />
     <Content Include="lib\js\jquery.min.js" />
