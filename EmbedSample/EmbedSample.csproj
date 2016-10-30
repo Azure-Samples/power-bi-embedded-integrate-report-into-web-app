@@ -166,6 +166,7 @@
     <Content Include="js\list.js" />
     <Content Include="js\modal.js" />
     <Content Include="js\theming.js" />
+    <Content Include="lib\js\es6-promise.auto.min.js" />
     <Content Include="packages.config" />
     <Content Include="scripts\powerbi.js" />
     <Content Include="scripts\powerbi.min.js" />
