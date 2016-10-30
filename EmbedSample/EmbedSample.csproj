@@ -166,7 +166,6 @@
     <Content Include="js\list.js" />
     <Content Include="js\modal.js" />
     <Content Include="js\theming.js" />
-    <Content Include="lib\js\es6-promise.auto.min.js" />
     <Content Include="packages.config" />
     <Content Include="scripts\powerbi.js" />
     <Content Include="scripts\powerbi.min.js" />
@@ -215,6 +214,7 @@
     <Content Include="lib\js\bootstrap.min.js" />
     <Content Include="lib\js\Chart.min.js" />
     <Content Include="lib\js\dataTables.bootstrap.min.js" />
+	<Content Include="lib\js\es6-promise.auto.min.js" />
     <Content Include="lib\js\jquery.dataTables.min.js" />
     <Content Include="lib\js\jquery.matchHeight-min.js" />
     <Content Include="lib\js\jquery.min.js" />
