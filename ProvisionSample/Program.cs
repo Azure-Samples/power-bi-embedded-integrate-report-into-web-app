@@ -89,7 +89,7 @@ namespace ProvisionSample
                     case '1':
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
-                            Console.Write("Azure Subscription ID:");
+                            Console.Write("Azure Subscription Id:");
                             subscriptionId = Console.ReadLine();
                             Console.WriteLine();
                         }
@@ -113,7 +113,7 @@ namespace ProvisionSample
                     case '2':
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
-                            Console.Write("Azure Subscription ID:");
+                            Console.Write("Azure Subscription Id:");
                             subscriptionId = Console.ReadLine();
                             Console.WriteLine();
                         }
@@ -136,7 +136,7 @@ namespace ProvisionSample
                     case '3':
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
-                            Console.Write("Azure Subscription ID:");
+                            Console.Write("Azure Subscription Id:");
                             subscriptionId = Console.ReadLine();
                             Console.WriteLine();
                         }
@@ -168,7 +168,7 @@ namespace ProvisionSample
 
                         foreach (var instance in workspaces)
                         {
-                            Console.WriteLine("Collection: {0}, ID: {1}", instance.WorkspaceCollectionName, instance.WorkspaceId);
+                            Console.WriteLine("Collection: {0}, Id: {1}", instance.WorkspaceCollectionName, instance.WorkspaceId);
                         }
 
                         await Run();
@@ -184,7 +184,7 @@ namespace ProvisionSample
                         var workspace = await CreateWorkspace(workspaceCollectionName);
                         workspaceId = workspace.WorkspaceId;
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("Workspace ID: {0}", workspaceId);
+                        Console.WriteLine("Workspace Id: {0}", workspaceId);
 
                         await Run();
                         break;
@@ -198,7 +198,7 @@ namespace ProvisionSample
 
                         if (string.IsNullOrWhiteSpace(workspaceId))
                         {
-                            Console.Write("Workspace ID:");
+                            Console.Write("Workspace Id:");
                             workspaceId = Console.ReadLine();
                             Console.WriteLine();
                         }
@@ -227,12 +227,16 @@ namespace ProvisionSample
 
                         if (string.IsNullOrWhiteSpace(workspaceId))
                         {
-                            Console.Write("Workspace ID:");
+                            Console.Write("Workspace Id:");
                             workspaceId = Console.ReadLine();
                             Console.WriteLine();
                         }
 
-                        await UpdateConnection(workspaceCollectionName, workspaceId);
+                        Console.Write("Dataset Id:");
+                        var datasetId = Console.ReadLine();
+                        Console.WriteLine();
+
+                        await UpdateConnection(workspaceCollectionName, workspaceId, datasetId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Connection information updated successfully.");
 
@@ -247,7 +251,7 @@ namespace ProvisionSample
                         }
                         if (string.IsNullOrWhiteSpace(workspaceId))
                         {
-                            Console.Write("Workspace ID:");
+                            Console.Write("Workspace Id:");
                             workspaceId = Console.ReadLine();
                             Console.WriteLine();
                         }
@@ -263,12 +267,12 @@ namespace ProvisionSample
                         }
                         if (string.IsNullOrWhiteSpace(workspaceId))
                         {
-                            Console.Write("Workspace ID:");
+                            Console.Write("Workspace Id:");
                             workspaceId = Console.ReadLine();
                             Console.WriteLine();
                         }
 
-                        Console.Write("Dataset ID:");
+                        Console.Write("Dataset Id:");
                         datasetId = Console.ReadLine();
                         Console.WriteLine();
 
@@ -288,12 +292,12 @@ namespace ProvisionSample
                         }
                         if (string.IsNullOrWhiteSpace(workspaceId))
                         {
-                            Console.Write("Workspace ID:");
+                            Console.Write("Workspace Id:");
                             workspaceId = Console.ReadLine();
                             Console.WriteLine();
                         }
 
-                        Console.Write("Import ID:");
+                        Console.Write("Import Id:");
                         var importId = Console.ReadLine();
                         Console.WriteLine();
 
@@ -491,7 +495,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task<Import> ImportPbix(string workspaceCollectionName, string workspaceId, string datasetName, string filePath)
         {
-            using (var fileStream = File.OpenRead(filePath))
+            using (var fileStream = File.OpenRead(filePath.Trim('"')))
             {
                 using (var client = await CreateClient())
                 {
@@ -527,9 +531,16 @@ namespace ProvisionSample
             {
                 ODataResponseListDataset response = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
 
-                foreach (Dataset d in response.Value)
+                if (response.Value.Any())
                 {
-                    Console.WriteLine("{0}:  {1}", d.Name, d.Id);
+                    foreach (Dataset d in response.Value)
+                    {
+                        Console.WriteLine("{0}:  {1}", d.Name, d.Id);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No Datasets found in this workspace");
                 }
             }
         }
@@ -555,8 +566,9 @@ namespace ProvisionSample
         /// </summary>
         /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
         /// <param name="workspaceId">The Power BI workspace id that contains the dataset</param>
+        /// <param name="id"></param>
         /// <returns></returns>
-        static async Task UpdateConnection(string workspaceCollectionName, string workspaceId)
+        static async Task UpdateConnection(string workspaceCollectionName, string workspaceId, string datasetId)
         {
             if (string.IsNullOrWhiteSpace(username))
             {
@@ -579,9 +591,6 @@ namespace ProvisionSample
 
             using (var client = await CreateClient())
             {
-                // Get the newly created dataset from the previous import process
-                var datasets = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
-
                 // Optionally udpate the connectionstring details if preent
                 if (!string.IsNullOrWhiteSpace(connectionString))
                 {
@@ -589,11 +598,11 @@ namespace ProvisionSample
                     {
                         { "connectionString", connectionString }
                     };
-                    await client.Datasets.SetAllConnectionsAsync(workspaceCollectionName, workspaceId, datasets.Value[datasets.Value.Count - 1].Id, connectionParameters);
+                    await client.Datasets.SetAllConnectionsAsync(workspaceCollectionName, workspaceId, datasetId, connectionParameters);
                 }
 
                 // Get the datasources from the dataset
-                var datasources = await client.Datasets.GetGatewayDatasourcesAsync(workspaceCollectionName, workspaceId, datasets.Value[datasets.Value.Count - 1].Id);
+                var datasources = await client.Datasets.GetGatewayDatasourcesAsync(workspaceCollectionName, workspaceId, datasetId);
 
                 // Reset your connection credentials
                 var delta = new GatewayDatasource
