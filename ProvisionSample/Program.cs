@@ -615,8 +615,13 @@ namespace ProvisionSample
                     }
                 };
 
+                if (datasources.Value.Count != 1)
+                {
+                    Console.Write("Expected one datasource, updating the first");
+                }
+
                 // Update the datasource with the specified credentials
-                await client.Gateways.PatchDatasourceAsync(workspaceCollectionName, workspaceId, datasources.Value[datasources.Value.Count - 1].GatewayId, datasources.Value[datasources.Value.Count - 1].Id, delta);
+                await client.Gateways.PatchDatasourceAsync(workspaceCollectionName, workspaceId, datasources.Value[0].GatewayId, datasources.Value[0].Id, delta);
             }
         }
 
