@@ -1,23 +1,23 @@
 using System;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Rest;
-using Microsoft.Threading;
-using ApiHost.Models;
-using System.IO;
-using System.Threading;
-using Microsoft.Rest.Serialization;
-using System.Net.Http.Headers;
-using System.Configuration;
-using System.Net;
 using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using ApiHost.Models;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.PowerBI.Api.V1;
 using Microsoft.PowerBI.Api.V1.Models;
+using Microsoft.Rest;
+using Microsoft.Rest.Serialization;
+using Microsoft.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Linq;
 
 namespace ProvisionSample
 {
@@ -38,9 +38,11 @@ namespace ProvisionSample
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
         static string datasetId = ConfigurationManager.AppSettings["datasetId"];
         static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
+        static Guid gatewayId = Guid.Empty;
         static string azureToken = null;
 
         static WorkspaceCollectionKeys accessKeys = null;
+        static string lastUsedworkspaceCollectionName = workspaceCollectionName;
 
         static void Main(string[] args)
         {
@@ -79,14 +81,19 @@ namespace ProvisionSample
                 Console.WriteLine("7. Update connection string info for an existing dataset");
                 Console.WriteLine("8. Retrieve a list of Datasets published to a workspace");
                 Console.WriteLine("9. Delete a published dataset from a workspace");
-                Console.WriteLine("0. Get status of import");
+                Console.WriteLine("10. Get status of import");
+                Console.WriteLine("11. Get Gateways for workspace collection");
+                Console.WriteLine("12. Get Gateways for workspace");
+                Console.WriteLine("13. Get Gateway metadata");
+                Console.WriteLine("14. Delete Gateway by id");
+                Console.WriteLine("15. Provisiona new Gateway");
                 Console.WriteLine();
 
-                var key = Console.ReadKey(true);
+                var command = Console.ReadLine();
 
-                switch (key.KeyChar)
+                switch (command)
                 {
-                    case '1':
+                    case "1":
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
                             Console.Write("Azure Subscription Id:");
@@ -110,7 +117,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '2':
+                    case "2":
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
                             Console.Write("Azure Subscription Id:");
@@ -133,7 +140,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '3':
+                    case "3":
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
                             Console.Write("Azure Subscription Id:");
@@ -158,7 +165,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '4':
+                    case "4":
                         Console.Write("Workspace Collection Name:");
                         workspaceCollectionName = Console.ReadLine();
                         Console.WriteLine();
@@ -173,7 +180,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '5':
+                    case "5":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
                         {
                             Console.Write("Workspace Collection Name:");
@@ -188,7 +195,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '6':
+                    case "6":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
                         {
                             Console.Write("Workspace Collection Name:");
@@ -217,7 +224,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '7':
+                    case "7":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
                         {
                             Console.Write("Workspace Collection Name:");
@@ -242,7 +249,7 @@ namespace ProvisionSample
 
                         await Run();
                         break;
-                    case '8':
+                    case "8":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
                         {
                             Console.Write("Workspace Collection Name:");
@@ -258,7 +265,7 @@ namespace ProvisionSample
 
                         await ListDatasets(workspaceCollectionName, workspaceId);
                         break;
-                    case '9':
+                    case "9":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
                         {
                             Console.Write("Workspace Collection Name:");
@@ -283,7 +290,7 @@ namespace ProvisionSample
                         break;
 
 
-                    case '0':
+                    case "10":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
                         {
                             Console.Write("Workspace Collection Name:");
@@ -323,6 +330,88 @@ namespace ProvisionSample
                                 Console.WriteLine("\t{0}: {1}", report.Name, report.WebUrl);
                             }
                         }
+                        break;
+                    case "11":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        var collectionGateways = await GetCollectionGateways(workspaceCollectionName);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        foreach (Gateway g in collectionGateways)
+                        {
+                            Console.WriteLine("Name:{0} Id:{1} ", g.Name, g.Id);
+                        }
+
+                        await Run();
+                        break;
+                    case "12":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Workspace ID:");
+                        workspaceId = Console.ReadLine();
+                        Console.WriteLine();
+
+                        var workspaceGateways = await GetWorkspaceGateways(workspaceCollectionName, workspaceId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        foreach (Gateway g in workspaceGateways)
+                        {
+                            Console.WriteLine("Name:{0} Id:{1} ", g.Name, g.Id);
+                        }
+
+                        await Run();
+                        break;
+                    case "13":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        var gateway = await GetGatewayById(workspaceCollectionName, gatewayId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("Name:{0} Id:{1} ", gateway.Name, gateway.Id);
+
+                        await Run();
+                        break;
+                    case "14":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        await DeleteGateway(workspaceCollectionName, gatewayId);
+                        await Run();
+                        break;
+                    case "15":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Gateway Name:");
+                        string gatewayName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Workspace Id:");
+                        workspaceId = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Public Key:");
+                        string publicKey = Console.ReadLine();
+                        Console.WriteLine();
+
+                        string createdGatewayId = await CreateGateway(workspaceCollectionName, gatewayName, workspaceId, publicKey);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("Name:{0} Id:{1} ", gatewayName, createdGatewayId);
+
+                        await Run();
                         break;
                     default:
                         Console.WriteLine("Press any key to exit..");
@@ -625,13 +714,61 @@ namespace ProvisionSample
             }
         }
 
+        static async Task<IEnumerable<Gateway>> GetCollectionGateways(string workspaceCollectionName)
+        {
+            using (var client = await CreateClient())
+            {
+                ODataResponseListGateway response = await client.Gateways.GetCollectionGatewaysAsync(workspaceCollectionName);
+                return response.Value;
+            }
+        }
+
+        static async Task<IEnumerable<Gateway>> GetWorkspaceGateways(string workspaceCollectionName, string workspaceId)
+        {
+            using (var client = await CreateClient())
+            {
+                ODataResponseListGateway response = await client.Gateways.GetWorkspaceGatewaysAsync(workspaceCollectionName, workspaceId);
+                return response.Value;
+            }
+        }
+
+        static async Task<Gateway> GetGatewayById(string workspaceCollectionName, Guid gatewayId)
+        {
+            using (var client = await CreateClient())
+            {
+                return await client.Gateways.GetGatewayByIdAsync(workspaceCollectionName, gatewayId.ToString());
+            }
+        }
+
+        static async Task DeleteGateway(string workspaceCollectionName, Guid gatewayId)
+        {
+            using (var client = await CreateClient())
+            {
+                await client.Gateways.DeleteGatewayByIdAsync(workspaceCollectionName, gatewayId.ToString());
+            }
+        }
+
+        static async Task<string> CreateGateway(string workspaceCollectionName, string gatewayName, string workspaceId, string publicKey)
+        {
+            using (var client = await CreateClient())
+            {
+                return (await client.Gateways.PostGatewayAsync(workspaceCollectionName,
+                    new CreateGatewayRequest
+                    {
+                        Name = gatewayName,
+                        PublicKey = publicKey,
+                        Workspaces = new List<WorkspaceId> { new WorkspaceId { Id = workspaceId } }
+                    })).Value;
+            }
+        }
+
         /// <summary>
         /// Creates a new instance of the PowerBIClient with the specified token
         /// </summary>
         /// <returns></returns>
         static async Task<PowerBIClient> CreateClient()
         {
-            if (accessKeys == null)
+            if (accessKeys == null || !workspaceCollectionName.Equals(lastUsedworkspaceCollectionName))
             {
                 Console.Write("Access Key: ");
                 accessKey = Console.ReadLine();
@@ -647,6 +784,8 @@ namespace ProvisionSample
             {
                 accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             }
+
+            lastUsedworkspaceCollectionName = workspaceCollectionName;
 
             // Create a token credentials with "AppKey" type
             var credentials = new TokenCredentials(accessKeys.Key1, "AppKey");
