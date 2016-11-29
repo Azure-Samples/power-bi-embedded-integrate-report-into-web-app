@@ -538,9 +538,9 @@ namespace ProvisionSample
 
             if (!string.IsNullOrWhiteSpace(workspaceCollectionName))
             {
-                char ch = 'a';
+                char ch;
                 Console.WriteLine("Workspace Collection Name: {0}", workspaceCollectionName);
-                Console.Write("To Reset press 'Y' or onther key to skip:");
+                Console.Write("To Reset press 'Y' or another key to skip:");
                 ch = Console.ReadKey().KeyChar;
                 if (ch == 'y' || ch == 'Y')
                 {
@@ -551,9 +551,9 @@ namespace ProvisionSample
 
             if (!string.IsNullOrWhiteSpace(workspaceId))
             {
-                char ch = 'a';
+                char ch;
                 Console.WriteLine("Workspace ID: {0}", workspaceId);
-                Console.Write("To Reset press 'Y' or onther key to skip:");
+                Console.Write("To Reset press 'Y' or another key to skip:");
                 ch = Console.ReadKey().KeyChar;
                 if (ch == 'y' || ch == 'Y')
                 {
@@ -564,9 +564,9 @@ namespace ProvisionSample
 
             if (gatewayId != Guid.Empty)
             {
-                char ch = 'a';
+                char ch;
                 Console.WriteLine("Gateway ID: {0}", gatewayId);
-                Console.Write("To Reset press 'Y' or onther key to skip:");
+                Console.Write("To Reset press 'Y' or another key to skip:");
                 ch = Console.ReadKey().KeyChar;
                 if (ch == 'y' || ch == 'Y')
                 {
