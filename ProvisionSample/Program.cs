@@ -39,10 +39,13 @@ namespace ProvisionSample
         static string datasetId = ConfigurationManager.AppSettings["datasetId"];
         static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
         static Guid gatewayId = Guid.Empty;
+        static Guid datasourceId = Guid.Empty;
         static string azureToken = null;
 
         static WorkspaceCollectionKeys accessKeys = null;
         static string lastUsedworkspaceCollectionName = workspaceCollectionName;
+        static GatewayPublicKey gatewayPublicKey = null;
+        static Guid lastUsedGatewayId = Guid.Empty;
 
         static void Main(string[] args)
         {
@@ -86,7 +89,11 @@ namespace ProvisionSample
                 Console.WriteLine("12. Get Gateways for workspace");
                 Console.WriteLine("13. Get Gateway metadata");
                 Console.WriteLine("14. Delete Gateway by id");
-                Console.WriteLine("15. Provisiona new Gateway");
+                Console.WriteLine("15. Create a new Datasource");
+                Console.WriteLine("16. Get Datasources for gateway");
+                Console.WriteLine("17. Get Datasource by id");
+                Console.WriteLine("18. Delete Datasource");
+                Console.WriteLine("19. Bind Dataset to Gateway");
                 Console.WriteLine();
 
                 var command = Console.ReadLine();
@@ -340,7 +347,7 @@ namespace ProvisionSample
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         foreach (Gateway g in collectionGateways)
                         {
-                            Console.WriteLine("Name:{0} Id:{1} ", g.Name, g.Id);
+                            Console.WriteLine("Name:{0} ,Id:{1} ,PublicKey < Exponent:{2} ,Modulus:{3} >", g.Name, g.Id, g.PublicKey.Exponent, g.PublicKey.Modulus);
                         }
 
                         await Run();
@@ -358,7 +365,7 @@ namespace ProvisionSample
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         foreach (Gateway g in workspaceGateways)
                         {
-                            Console.WriteLine("Name:{0} Id:{1} ", g.Name, g.Id);
+                            Console.WriteLine("Name:{0} ,Id:{1} ,PublicKey < Exponent:{2} ,Modulus:{3} >", g.Name, g.Id, g.PublicKey.Exponent, g.PublicKey.Modulus);
                         }
 
                         await Run();
@@ -374,7 +381,7 @@ namespace ProvisionSample
 
                         var gateway = await GetGatewayById(workspaceCollectionName, gatewayId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("Name:{0} Id:{1} ", gateway.Name, gateway.Id);
+                        Console.WriteLine("Name:{0} ,Id:{1} ,PublicKey < Exponent:{2} ,Modulus:{3} >", gateway.Name, gateway.Id, gateway.PublicKey.Exponent, gateway.PublicKey.Modulus);
 
                         await Run();
                         break;
@@ -395,23 +402,84 @@ namespace ProvisionSample
                         workspaceCollectionName = Console.ReadLine();
                         Console.WriteLine();
 
-                        Console.Write("Gateway Name:");
-                        string gatewayName = Console.ReadLine();
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
                         Console.WriteLine();
 
-                        Console.Write("Workspace Id:");
-                        workspaceId = Console.ReadLine();
-                        Console.WriteLine();
+                        var publishDatasourceRequest = await GetPublishDatasourceRequestFromUser(workspaceCollectionName, gatewayId);
 
-                        Console.Write("Public Key:");
-                        string publicKey = Console.ReadLine();
-                        Console.WriteLine();
-
-                        string createdGatewayId = await CreateGateway(workspaceCollectionName, gatewayName, workspaceId, publicKey);
+                        GatewayDatasource createdDatasource = await CreateDatasource(workspaceCollectionName, gatewayId, publishDatasourceRequest);
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("Name:{0} Id:{1} ", gatewayName, createdGatewayId);
+                        Console.WriteLine("Id:{0} ", createdDatasource.Id);
 
                         await Run();
+                        break;
+                    case "16":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        var datasources = await GetDatasources(workspaceCollectionName, gatewayId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("Gateway Id: {0}", gatewayId);
+                        foreach (var ds in datasources)
+                        {
+                            Console.WriteLine("Datasource Id:{0} connection details: {1}", ds.Id, ds.ConnectionDetails);
+                        }
+                        break;
+                    case "17":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        Console.Write("Datasource ID:");
+                        datasourceId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        var datasource = await GetDatasource(workspaceCollectionName, gatewayId, datasourceId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("Gateway Id: {0}", gatewayId);
+                        Console.WriteLine("Datasource Id:{0} ", datasource.Id);
+                        break;
+                    case "18":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        Console.Write("Datasource ID:");
+                        datasourceId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        await DeleteDatasource(workspaceCollectionName, gatewayId, datasourceId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("Delete datasource id: {0} successfully", datasourceId);
+                        break;
+                    case "19":
+                        Console.Write("Workspace Collection Name:");
+                        workspaceCollectionName = Console.ReadLine();
+                        Console.WriteLine();
+
+                        Console.Write("Dataset ID:");
+                        var datasetObjectId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        Console.Write("Gateway ID:");
+                        gatewayId = Guid.Parse(Console.ReadLine());
+                        Console.WriteLine();
+
+                        await BindToGateway(workspaceCollectionName, datasetObjectId, gatewayId);
                         break;
                     default:
                         Console.WriteLine("Press any key to exit..");
@@ -736,7 +804,10 @@ namespace ProvisionSample
         {
             using (var client = await CreateClient())
             {
-                return await client.Gateways.GetGatewayByIdAsync(workspaceCollectionName, gatewayId.ToString());
+                var gateway = await client.Gateways.GetGatewayByIdAsync(workspaceCollectionName, gatewayId.ToString());
+                gatewayPublicKey = gateway.PublicKey;
+                lastUsedGatewayId = Guid.Parse(gateway.Id);
+                return gateway;
             }
         }
 
@@ -759,6 +830,107 @@ namespace ProvisionSample
                         PublicKey = publicKey,
                         Workspaces = new List<WorkspaceId> { new WorkspaceId { Id = workspaceId } }
                     })).Value;
+            }
+        }
+
+        private static async Task<PublishDatasourceToGatewayRequest> GetPublishDatasourceRequestFromUser(string workspaceCollectionName, Guid gatewayId)
+        {
+            var request = new PublishDatasourceToGatewayRequest();
+            request.DataSourceType = "Sql";
+            request.CredentialDetails = new CredentialDetails();
+            request.CredentialDetails.CredentialType = "Windows";
+            request.CredentialDetails.EncryptionAlgorithm = "RSA-OAEP";
+
+            Console.Write("Connection Details:");
+            request.ConnectionDetails = Console.ReadLine();
+            Console.WriteLine();
+
+            Console.Write("Datasource Name:");
+            request.DataSourceName = Console.ReadLine();
+            Console.WriteLine();
+
+            Console.Write("Username:");
+            string username = Console.ReadLine();
+            Console.WriteLine();
+
+            Console.Write("Password:");
+            string password = Console.ReadLine();
+            Console.WriteLine();
+
+            await EnsureGatewayPublicKey(workspaceCollectionName, gatewayId);
+            request.CredentialDetails.Credentials = AsymmetricKeyEncryptionHelper.EncodeCredentials(username, password, gatewayPublicKey);
+
+            Console.Write("Encrypted Connection: <Encrypted / NotEncrypted>");
+            request.CredentialDetails.EncryptedConnection = Console.ReadLine();
+            Console.WriteLine();
+
+            Console.Write("Privacy Level: <None / Private / Organizational / Public>");
+            request.CredentialDetails.PrivacyLevel = Console.ReadLine();
+            Console.WriteLine();
+
+            return request;
+        }
+
+        private static async Task<GatewayDatasource> CreateDatasource(string workspaceCollectionName, Guid gatewayId, PublishDatasourceToGatewayRequest request)
+        {
+            using (var client = await CreateClient())
+            {
+                return await client.Gateways.CreateDatasourceAsync(workspaceCollectionName, gatewayId.ToString(), request);
+            }
+        }
+
+        private static async Task<IEnumerable<GatewayDatasource>> GetDatasources(string workspaceCollectionName, Guid gatewayId)
+        {
+            using (var client = await CreateClient())
+            {
+                var datasources = await client.Gateways.GetDatasourcesAsync(workspaceCollectionName, gatewayId.ToString());
+                return datasources.Value;
+            }
+        }
+
+        private static async Task<GatewayDatasource> GetDatasource(string workspaceCollectionName, Guid gatewayId, Guid datasourceId)
+        {
+            using (var client = await CreateClient())
+            {
+                var datasource = await client.Gateways.GetDatasourceByIdAsync(workspaceCollectionName, gatewayId.ToString(), datasourceId.ToString());
+                return datasource;
+            }
+        }
+
+        private static async Task DeleteDatasource(string workspaceCollectionName, Guid gatewayId, Guid datasourceId)
+        {
+            using (var client = await CreateClient())
+            {
+                await client.Gateways.DeleteDatasourceAsync(workspaceCollectionName, gatewayId.ToString(), datasourceId.ToString());
+            }
+        }
+
+        private static async Task BindToGateway(string workspaceCollectionName, Guid datasetId, Guid gatewayId)
+        {
+            using (var client = await CreateClient())
+            {
+                await client.Datasets.BindToGatewayAsync(workspaceCollectionName, datasetId.ToString(), new BindToGatewayRequest(gatewayId.ToString()));
+            }
+        }
+
+        static async Task EnsureGatewayPublicKey(string workspaceCollectionName, Guid gatewayId)
+        {
+            if (gatewayPublicKey == null || gatewayId != lastUsedGatewayId)
+            {
+                Console.Write("Gateway Public Key exponent:");
+                string exponent = Console.ReadLine();
+                Console.WriteLine();
+
+                Console.Write("Gateway Public Key modulus:");
+                string modulus = Console.ReadLine();
+                Console.WriteLine();
+
+                gatewayPublicKey = new GatewayPublicKey(exponent, modulus);
+            }
+
+            if (gatewayPublicKey == null)
+            {
+                gatewayPublicKey = (await GetGatewayById(workspaceCollectionName, gatewayId)).PublicKey;
             }
         }
 
