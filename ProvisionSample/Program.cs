@@ -75,6 +75,7 @@ namespace ProvisionSample
                 Console.WriteLine();
                 Console.WriteLine("What do you want to do?");
                 Console.WriteLine("=================================================================");
+                Console.WriteLine("0. Reset cached metadata");
                 Console.WriteLine("1. Provision a new workspace collection");
                 Console.WriteLine("2. Get workspace collection metadata");
                 Console.WriteLine("3. Retrieve a workspace collection's API keys");
@@ -100,6 +101,9 @@ namespace ProvisionSample
 
                 switch (command)
                 {
+                    case "0":
+                        ResetCachedMetadata();
+                        break;
                     case "1":
                         if (string.IsNullOrWhiteSpace(subscriptionId))
                         {
@@ -121,8 +125,6 @@ namespace ProvisionSample
                         accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Workspace collection created successfully");
-
-                        await Run();
                         break;
                     case "2":
                         if (string.IsNullOrWhiteSpace(subscriptionId))
@@ -144,8 +146,6 @@ namespace ProvisionSample
                         var metadata = await GetWorkspaceCollectionMetadata(subscriptionId, resourceGroup, workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine(metadata);
-
-                        await Run();
                         break;
                     case "3":
                         if (string.IsNullOrWhiteSpace(subscriptionId))
@@ -169,13 +169,14 @@ namespace ProvisionSample
                         Console.WriteLine("Key1: {0}", accessKeys.Key1);
                         Console.WriteLine("===============================");
                         Console.WriteLine("Key2: {0}", accessKeys.Key2);
-
-                        await Run();
                         break;
                     case "4":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         var workspaces = await GetWorkspaces(workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -184,8 +185,6 @@ namespace ProvisionSample
                         {
                             Console.WriteLine("Collection: {0}, Id: {1}", instance.WorkspaceCollectionName, instance.WorkspaceId);
                         }
-
-                        await Run();
                         break;
                     case "5":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
@@ -199,8 +198,6 @@ namespace ProvisionSample
                         workspaceId = workspace.WorkspaceId;
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Workspace Id: {0}", workspaceId);
-
-                        await Run();
                         break;
                     case "6":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
@@ -228,8 +225,6 @@ namespace ProvisionSample
                         var import = await ImportPbix(workspaceCollectionName, workspaceId, datasetName, filePath);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Import: {0}", import.Id);
-
-                        await Run();
                         break;
                     case "7":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
@@ -253,8 +248,6 @@ namespace ProvisionSample
                         await UpdateConnection(workspaceCollectionName, workspaceId, datasetId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Connection information updated successfully.");
-
-                        await Run();
                         break;
                     case "8":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
@@ -339,9 +332,12 @@ namespace ProvisionSample
                         }
                         break;
                     case "11":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         var collectionGateways = await GetCollectionGateways(workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -349,17 +345,20 @@ namespace ProvisionSample
                         {
                             Console.WriteLine("Name:{0} ,Id:{1} ,PublicKey < Exponent:{2} ,Modulus:{3} >", g.Name, g.Id, g.PublicKey.Exponent, g.PublicKey.Modulus);
                         }
-
-                        await Run();
                         break;
                     case "12":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
-
-                        Console.Write("Workspace ID:");
-                        workspaceId = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (string.IsNullOrWhiteSpace(workspaceId))
+                        {
+                            Console.Write("Workspace Id:");
+                            workspaceId = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         var workspaceGateways = await GetWorkspaceGateways(workspaceCollectionName, workspaceId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -367,13 +366,14 @@ namespace ProvisionSample
                         {
                             Console.WriteLine("Name:{0} ,Id:{1} ,PublicKey < Exponent:{2} ,Modulus:{3} >", g.Name, g.Id, g.PublicKey.Exponent, g.PublicKey.Modulus);
                         }
-
-                        await Run();
                         break;
                     case "13":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         Console.Write("Gateway ID:");
                         gatewayId = Guid.Parse(Console.ReadLine());
@@ -382,46 +382,58 @@ namespace ProvisionSample
                         var gateway = await GetGatewayById(workspaceCollectionName, gatewayId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Name:{0} ,Id:{1} ,PublicKey < Exponent:{2} ,Modulus:{3} >", gateway.Name, gateway.Id, gateway.PublicKey.Exponent, gateway.PublicKey.Modulus);
-
-                        await Run();
                         break;
                     case "14":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         Console.Write("Gateway ID:");
                         gatewayId = Guid.Parse(Console.ReadLine());
                         Console.WriteLine();
 
                         await DeleteGateway(workspaceCollectionName, gatewayId);
-                        await Run();
                         break;
                     case "15":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
-
-                        Console.Write("Gateway ID:");
-                        gatewayId = Guid.Parse(Console.ReadLine());
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (gatewayId == Guid.Empty)
+                        {
+                            Console.Write("Gateway ID:");
+                            gatewayId = Guid.Parse(Console.ReadLine());
+                            Console.WriteLine();
+                        }
 
                         var publishDatasourceRequest = await GetPublishDatasourceRequestFromUser(workspaceCollectionName, gatewayId);
+                        if (publishDatasourceRequest == null)
+                        {
+                            break;
+                        }
 
                         GatewayDatasource createdDatasource = await CreateDatasource(workspaceCollectionName, gatewayId, publishDatasourceRequest);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Id:{0} ", createdDatasource.Id);
-
-                        await Run();
                         break;
                     case "16":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
-
-                        Console.Write("Gateway ID:");
-                        gatewayId = Guid.Parse(Console.ReadLine());
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (gatewayId == Guid.Empty)
+                        {
+                            Console.Write("Gateway ID:");
+                            gatewayId = Guid.Parse(Console.ReadLine());
+                            Console.WriteLine();
+                        }
 
                         var datasources = await GetDatasources(workspaceCollectionName, gatewayId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -432,13 +444,18 @@ namespace ProvisionSample
                         }
                         break;
                     case "17":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
-
-                        Console.Write("Gateway ID:");
-                        gatewayId = Guid.Parse(Console.ReadLine());
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (gatewayId == Guid.Empty)
+                        {
+                            Console.Write("Gateway ID:");
+                            gatewayId = Guid.Parse(Console.ReadLine());
+                            Console.WriteLine();
+                        }
 
                         Console.Write("Datasource ID:");
                         datasourceId = Guid.Parse(Console.ReadLine());
@@ -450,13 +467,18 @@ namespace ProvisionSample
                         Console.WriteLine("Datasource Id:{0} ", datasource.Id);
                         break;
                     case "18":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
-
-                        Console.Write("Gateway ID:");
-                        gatewayId = Guid.Parse(Console.ReadLine());
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
+                        if (gatewayId == Guid.Empty)
+                        {
+                            Console.Write("Gateway ID:");
+                            gatewayId = Guid.Parse(Console.ReadLine());
+                            Console.WriteLine();
+                        }
 
                         Console.Write("Datasource ID:");
                         datasourceId = Guid.Parse(Console.ReadLine());
@@ -467,9 +489,12 @@ namespace ProvisionSample
                         Console.WriteLine("Delete datasource id: {0} successfully", datasourceId);
                         break;
                     case "19":
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         Console.Write("Dataset ID:");
                         var datasetObjectId = Guid.Parse(Console.ReadLine());
@@ -505,6 +530,49 @@ namespace ProvisionSample
             using (var client = await CreateClient())
             {
                 return await client.Imports.GetImportByIdAsync(workspaceCollectionName, workspaceId, importId);
+            }
+        }
+
+        static void ResetCachedMetadata()
+        {
+
+            if (!string.IsNullOrWhiteSpace(workspaceCollectionName))
+            {
+                char ch = 'a';
+                Console.WriteLine("Workspace Collection Name: {0}", workspaceCollectionName);
+                Console.Write("To Reset press 'Y' or onther key to skip:");
+                ch = Console.ReadKey().KeyChar;
+                if (ch == 'y' || ch == 'Y')
+                {
+                    workspaceCollectionName = null;
+                }
+                Console.WriteLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(workspaceId))
+            {
+                char ch = 'a';
+                Console.WriteLine("Workspace ID: {0}", workspaceId);
+                Console.Write("To Reset press 'Y' or onther key to skip:");
+                ch = Console.ReadKey().KeyChar;
+                if (ch == 'y' || ch == 'Y')
+                {
+                    workspaceId = null;
+                }
+                Console.WriteLine();
+            }
+
+            if (gatewayId != Guid.Empty)
+            {
+                char ch = 'a';
+                Console.WriteLine("Gateway ID: {0}", gatewayId);
+                Console.Write("To Reset press 'Y' or onther key to skip:");
+                ch = Console.ReadKey().KeyChar;
+                if (ch == 'y' || ch == 'Y')
+                {
+                    gatewayId = Guid.Empty;
+                }
+                Console.WriteLine();
             }
         }
 
@@ -841,7 +909,8 @@ namespace ProvisionSample
             request.CredentialDetails.CredentialType = "Windows";
             request.CredentialDetails.EncryptionAlgorithm = "RSA-OAEP";
 
-            Console.Write("Connection Details:");
+            Console.WriteLine("Connection Details:");
+            Console.WriteLine("ex: {\"server\":\"<your server>\",\"database\":\"<your database>\"}");
             request.ConnectionDetails = Console.ReadLine();
             Console.WriteLine();
 
@@ -860,12 +929,39 @@ namespace ProvisionSample
             await EnsureGatewayPublicKey(workspaceCollectionName, gatewayId);
             request.CredentialDetails.Credentials = AsymmetricKeyEncryptionHelper.EncodeCredentials(username, password, gatewayPublicKey);
 
-            Console.Write("Encrypted Connection: <Encrypted / NotEncrypted>");
-            request.CredentialDetails.EncryptedConnection = Console.ReadLine();
+            Console.WriteLine("Encrypted Connection?");
+            Console.WriteLine("\t1.Encrypted");
+            Console.WriteLine("\t2.NotEncrypted");
+            string str = Console.ReadLine();
+            if (str != "1" && str != "2")
+            {
+                return null;
+            }
+            request.CredentialDetails.EncryptedConnection = str == "1" ? "Encrypted" : "NotEncrypted";
             Console.WriteLine();
 
-            Console.Write("Privacy Level: <None / Private / Organizational / Public>");
-            request.CredentialDetails.PrivacyLevel = Console.ReadLine();
+            Console.Write("Privacy Level:");
+            Console.Write("\t1.None");
+            Console.Write("\t2.Private");
+            Console.Write("\t3.Organizational");
+            Console.Write("\t4.Public");
+            switch (str)
+            {
+                case "1":
+                    request.CredentialDetails.PrivacyLevel = "None";
+                    break;
+                case "2":
+                    request.CredentialDetails.PrivacyLevel = "Private";
+                    break;
+                case "3":
+                    request.CredentialDetails.PrivacyLevel = "Organizational";
+                    break;
+                case "4":
+                    request.CredentialDetails.PrivacyLevel = "Public";
+                    break;
+                default:
+                    return null;
+            }
             Console.WriteLine();
 
             return request;
