@@ -117,9 +117,12 @@ namespace ProvisionSample
                             resourceGroup = Console.ReadLine();
                             Console.WriteLine();
                         }
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName);
                         accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
@@ -139,9 +142,12 @@ namespace ProvisionSample
                             resourceGroup = Console.ReadLine();
                             Console.WriteLine();
                         }
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         var metadata = await GetWorkspaceCollectionMetadata(subscriptionId, resourceGroup, workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -160,9 +166,12 @@ namespace ProvisionSample
                             resourceGroup = Console.ReadLine();
                             Console.WriteLine();
                         }
-                        Console.Write("Workspace Collection Name:");
-                        workspaceCollectionName = Console.ReadLine();
-                        Console.WriteLine();
+                        if (string.IsNullOrWhiteSpace(workspaceCollectionName))
+                        {
+                            Console.Write("Workspace Collection Name:");
+                            workspaceCollectionName = Console.ReadLine();
+                            Console.WriteLine();
+                        }
 
                         accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -262,8 +271,19 @@ namespace ProvisionSample
                             workspaceId = Console.ReadLine();
                             Console.WriteLine();
                         }
-
-                        await ListDatasets(workspaceCollectionName, workspaceId);
+                        var datasets = await ListDatasets(workspaceCollectionName, workspaceId);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        if (datasets.Any())
+                        {
+                            foreach (Dataset d in datasets)
+                            {
+                                Console.WriteLine("{0}:  {1}", d.Name, d.Id);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("No Datasets found in this workspace");
+                        }
                         break;
                     case "9":
                         if (string.IsNullOrWhiteSpace(workspaceCollectionName))
@@ -750,23 +770,12 @@ namespace ProvisionSample
         /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
         /// <param name="workspaceId">The target Power BI workspace id</param>
         /// <returns></returns>
-        static async Task ListDatasets(string workspaceCollectionName, string workspaceId)
+        static async Task<IList<Dataset>> ListDatasets(string workspaceCollectionName, string workspaceId)
         {
             using (var client = await CreateClient())
             {
                 ODataResponseListDataset response = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
-
-                if (response.Value.Any())
-                {
-                    foreach (Dataset d in response.Value)
-                    {
-                        Console.WriteLine("{0}:  {1}", d.Name, d.Id);
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("No Datasets found in this workspace");
-                }
+                return response.Value;
             }
         }
 
@@ -923,7 +932,7 @@ namespace ProvisionSample
             Console.WriteLine();
 
             Console.Write("Password:");
-            string password = Console.ReadLine();
+            string password = ConsoleHelper.ReadPassword();
             Console.WriteLine();
 
             await EnsureGatewayPublicKey(workspaceCollectionName, gatewayId);
