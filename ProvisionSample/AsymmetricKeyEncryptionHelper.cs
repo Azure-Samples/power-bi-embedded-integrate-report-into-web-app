@@ -16,7 +16,7 @@ namespace ProvisionSample
         {
             // using json serializer to handle escape characters in username and password
             var plainText = string.Format("{{\"credentialData\":[{{\"value\":{0},\"name\":\"username\"}},{{\"value\":{1},\"name\":\"password\"}}]}}", JsonConvert.SerializeObject(userName), JsonConvert.SerializeObject(password));
-            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(publicKey.Modulus.Length * 8))
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(EncryptedLength * 8))
             {
                 var parameters = rsa.ExportParameters(false);
                 parameters.Exponent = Convert.FromBase64String(publicKey.Exponent);
@@ -31,11 +31,11 @@ namespace ProvisionSample
             byte[] plainTextArray = Encoding.UTF8.GetBytes(plainText);
 
             // Split the message into different segments, each segment's length is 85. So the result may be 85,85,85,20.
-            bool hasIncompleteSegment = plainTextArray.Length%SegmentLength != 0;
+            bool hasIncompleteSegment = plainTextArray.Length % SegmentLength != 0;
 
-            int segmentNumber = (!hasIncompleteSegment) ? (plainTextArray.Length/SegmentLength) : ((plainTextArray.Length/SegmentLength) + 1);
+            int segmentNumber = (!hasIncompleteSegment) ? (plainTextArray.Length / SegmentLength) : ((plainTextArray.Length / SegmentLength) + 1);
 
-            byte[] encryptedData = new byte[segmentNumber*EncryptedLength];
+            byte[] encryptedData = new byte[segmentNumber * EncryptedLength];
             int encryptedDataPosition = 0;
 
             for (var i = 0; i < segmentNumber; i++)
