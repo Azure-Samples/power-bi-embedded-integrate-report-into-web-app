@@ -458,9 +458,16 @@ namespace ProvisionSample
                         var datasources = await GetDatasources(workspaceCollectionName, gatewayId);
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.WriteLine("Gateway Id: {0}", gatewayId);
-                        foreach (var ds in datasources)
+                        if (datasources.Any())
                         {
-                            Console.WriteLine("Datasource Id:{0} connection details: {1}", ds.Id, ds.ConnectionDetails);
+                            foreach (var ds in datasources)
+                            {
+                                Console.WriteLine("Datasource Id:{0} connection details: {1}", ds.Id, ds.ConnectionDetails);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("No datasources found in this gateway");
                         }
                         break;
                     case "17":
@@ -954,6 +961,7 @@ namespace ProvisionSample
             Console.Write("\t2.Private");
             Console.Write("\t3.Organizational");
             Console.Write("\t4.Public");
+            str = Console.ReadLine();
             switch (str)
             {
                 case "1":
