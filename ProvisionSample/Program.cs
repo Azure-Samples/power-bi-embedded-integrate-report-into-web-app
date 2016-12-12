@@ -312,8 +312,11 @@ namespace ProvisionSample
                 workspaceCollectionName = Console.ReadLine();
                 Console.WriteLine();
             }
+            Console.Write("Workspace Name:");
+            var workspaceName = Console.ReadLine();
+            Console.WriteLine();
 
-            var workspace = await CreateWorkspace(workspaceCollectionName);
+            var workspace = await CreateWorkspace(workspaceCollectionName, workspaceName);
             workspaceId = workspace.WorkspaceId;
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Workspace Id: {0}", workspaceId);
@@ -900,12 +903,17 @@ namespace ProvisionSample
         /// </summary>
         /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
         /// <returns></returns>
-        static async Task<Workspace> CreateWorkspace(string workspaceCollectionName)
+        static async Task<Workspace> CreateWorkspace(string workspaceCollectionName, string workspaceName)
         {
+            CreateWorkspaceRequest request = null;
+            if (!string.IsNullOrEmpty(workspaceName))
+            {
+                request = new CreateWorkspaceRequest(workspaceName);
+            }
             using (var client = await CreateClient())
             {
                 // Create a new workspace witin the specified collection
-                return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName);
+                return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName, request);
             }
         }
 
