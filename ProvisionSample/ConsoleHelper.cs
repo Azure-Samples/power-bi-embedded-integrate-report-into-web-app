@@ -107,18 +107,21 @@ namespace ProvisionSample
 
             return null;
         }
-        virtual public string ResetCachedParam(string param, string desc, bool forceReset = false)
+        virtual public string ManageCachedParam(string param, string desc, bool forceReset = false)
         {
             if (forceReset)
+            {
                 return null;
+            }
+
             char ch;
             if (!string.IsNullOrWhiteSpace(param))
             {
-                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'Y': To Reset, 'A': to assign, or any another key to skip:");
+                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'Y': To Reset, 'A': to assign, Any another key to skip:");
             }
             else 
             {
-                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'A': to assign, or any another key to skip:");
+                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'A': to assign, Any another key to skip:");
             }
             ch = Console.ReadKey().KeyChar;
             Console.WriteLine();

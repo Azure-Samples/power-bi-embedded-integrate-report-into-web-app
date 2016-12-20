@@ -111,8 +111,8 @@ namespace ProvisionSample
                     switch (adminCommand.Value)
                     {
                         case AdminCommands.Exit: return false;
-                        case AdminCommands.ClearCache: ResetCachedMetadata(forceReset: true); break;
-                        case AdminCommands.ManageCache: ResetCachedMetadata(forceReset: false); break;
+                        case AdminCommands.ClearCache: ManageCachedMetadata(forceReset: true); break;
+                        case AdminCommands.ManageCache: ManageCachedMetadata(forceReset: false); break;
                         case AdminCommands.ShowCache: ShowCachedMetadata(); break;
                     }
                 }
@@ -487,22 +487,33 @@ namespace ProvisionSample
 
             Console.WriteLine();
         }
-        static void ResetCachedMetadata(bool forceReset = false)
+
+        static void ManageCachedMetadata(bool forceReset)
         {
-            workspaceCollectionName = userInput.ResetCachedParam(workspaceCollectionName, "Workspace Collection Name", forceReset);
-            accessKeys.Key1 = userInput.ResetCachedParam(accessKeys.Key1, "Workspace Collection Access Key1", forceReset);
-            if (string.IsNullOrWhiteSpace(accessKeys.Key1))
+            workspaceCollectionName = userInput.ManageCachedParam(workspaceCollectionName, "Workspace Collection Name", forceReset);
+
+            string accessKeysKey1 = accessKeys != null ? accessKeys.Key1 : null;
+            accessKeysKey1 = userInput.ManageCachedParam(accessKeysKey1, "Workspace Collection Access Key1", forceReset);
+            if (accessKeysKey1 == null)
             {
                 accessKeys = null;
             }
-            workspaceId = userInput.ResetCachedParam(workspaceId, "Workspace Id", forceReset);
-            gatewayId = userInput.ResetCachedParam(gatewayId, "Gateway Id", forceReset);
-            datasourceId = userInput.ResetCachedParam(datasourceId, "Datasource Id", forceReset);
-            datasetId = userInput.ResetCachedParam(datasetId, "Dataset Id", forceReset);
+            else
+            {
+                accessKeys = new WorkspaceCollectionKeys
+                {
+                    Key1 = accessKeysKey1
+                };
+            } 
+
+            workspaceId = userInput.ManageCachedParam(workspaceId, "Workspace Id", forceReset);
+            gatewayId = userInput.ManageCachedParam(gatewayId, "Gateway Id", forceReset);
+            datasourceId = userInput.ManageCachedParam(datasourceId, "Datasource Id", forceReset);
+            datasetId = userInput.ManageCachedParam(datasetId, "Dataset Id", forceReset);
             if (gatewayPublicKey != null)
             {
                 string exponentAndModulus = "Exp:" + gatewayPublicKey.Exponent + " Mod:" + gatewayPublicKey.Modulus;
-                exponentAndModulus = userInput.ResetCachedParam(exponentAndModulus, "Gateway Public Key", forceReset);
+                exponentAndModulus = userInput.ManageCachedParam(exponentAndModulus, "Gateway Public Key", forceReset);
                 if (string.IsNullOrWhiteSpace(exponentAndModulus))
                 {
                     gatewayPublicKey = null;
@@ -993,6 +1004,7 @@ namespace ProvisionSample
 
             if (accessKeys == null)
             {
+                // get the current collection's keys
                 accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             }
 
