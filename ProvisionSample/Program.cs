@@ -72,29 +72,28 @@ namespace ProvisionSample
 
         static void SetupCommands()
         {
-            commands.RegisterCommand("Reserved for future use...", null);
-            commands.RegisterCommand("Provision a new workspace collection", ProvisionNewWorkspaceCollection);
             commands.RegisterCommand("Get list of workspace collections", ListWorkspaceCollections);
             commands.RegisterCommand("Get workspace collection metadata", GetWorkspaceCollectionMetadata);
             commands.RegisterCommand("Get a workspace collection's API keys", ListWorkspaceCollectionApiKeys);
             commands.RegisterCommand("Get list of workspaces within a collection", ListWorkspacesInCollection);
-            commands.RegisterCommand("Provision a new workspace in an existing workspace collection", ProvisionNewWorkspace);
-            commands.RegisterCommand("Import PBIX Desktop file into an existing workspace", ImportPBIX);
-            commands.RegisterCommand("Update connection string info for an existing dataset", UpdateConnetionString);
-            ////commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
-            commands.RegisterCommand("Get a list of Datasets published to a workspace", ListDatasetInWorkspace);
-            commands.RegisterCommand("Delete a published dataset from a workspace", DeleteDataset);
-            commands.RegisterCommand("Get status of import", GetImportStatus);
             commands.RegisterCommand("Get Gateways for workspace collection", ListGatewaysForWorkspaceCollection);
             commands.RegisterCommand("Get Gateways for workspace", ListGatewaysForWorkspace);
             commands.RegisterCommand("Get Gateway metadata", GetGatewayMetadata);
-            commands.RegisterCommand("Delete Gateway by id", DeleteGateway);
-            commands.RegisterCommand("Create a new Datasource", CreateDatasource);
+            commands.RegisterCommand("Get a list of Datasets published to a workspace", ListDatasetInWorkspace);
             commands.RegisterCommand("Get Datasources for gateway", ListDatasources);
             commands.RegisterCommand("Get Datasource by id", GetDatasourceById);
-            commands.RegisterCommand("Delete Datasource by id", DeleteDatasource);
+            commands.RegisterCommand("Get status of import", GetImportStatus);
+            commands.RegisterCommand("Provision a new workspace collection", ProvisionNewWorkspaceCollection);
+            commands.RegisterCommand("Provision a new workspace in an existing workspace collection", ProvisionNewWorkspace);
+            commands.RegisterCommand("Import PBIX Desktop file into an existing workspace", ImportPBIX);
+            commands.RegisterCommand("Create a new Datasource", CreateDatasource);
+            commands.RegisterCommand("Update connection string info for an existing dataset", UpdateConnetionString);
             commands.RegisterCommand("Bind Dataset to Gateway", BindDataset);
             commands.RegisterCommand("Update Datasource", UpdateDatasource);
+            ////commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
+            commands.RegisterCommand("Delete a published dataset from a workspace", DeleteDataset);
+            commands.RegisterCommand("Delete Gateway by id", DeleteGateway);
+            commands.RegisterCommand("Delete Datasource by id", DeleteDatasource);
         }
 
         static async Task<bool> Run()
@@ -119,10 +118,11 @@ namespace ProvisionSample
                 }
                 else if (numericCommand.HasValue)
                 {
+                    int index = numericCommand.Value - 1;
                     Func<Task> operation = null;
-                    if (numericCommand.Value >= 0)
+                    if (index >= 0)
                     {
-                        operation = commands.GetCommand(numericCommand.Value);
+                        operation = commands.GetCommand(index);
                     }
 
                     if (operation != null)
@@ -131,7 +131,7 @@ namespace ProvisionSample
                     }
                     else
                     {
-                        Console.WriteLine("Numeric value {0} does not have a valid operation", numericCommand);
+                        Console.WriteLine("Numeric value {0} does not have a valid operation", numericCommand.Value);
                     }
                 }
                 else
@@ -158,25 +158,25 @@ namespace ProvisionSample
 
         }
 
-        static void EnsureBasicParams(EnsureExtras extras, EnsureExtras reEnter = EnsureExtras.None)
+        static void EnsureBasicParams(EnsureExtras extras, EnsureExtras forceEntering = EnsureExtras.None)
         {
             subscriptionId = userInput.EnsureParam(subscriptionId, "Azure Subscription Id", onlyFillIfEmpty: true);
             resourceGroup = userInput.EnsureParam(resourceGroup, "Azure Resource Group", onlyFillIfEmpty: true);
 
             if ((extras & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection)
-                workspaceCollectionName = userInput.EnsureParam(workspaceCollectionName, "Workspace Collection Name", forceReEnter: ((reEnter & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection));
+                workspaceCollectionName = userInput.EnsureParam(workspaceCollectionName, "Workspace Collection Name", forceReEnter: ((forceEntering & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection));
 
             if ((extras & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId)
-                workspaceId = userInput.EnsureParam(workspaceId, "Workspace Id", forceReEnter: ((reEnter & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId));
+                workspaceId = userInput.EnsureParam(workspaceId, "Workspace Id", forceReEnter: ((forceEntering & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId));
 
             if ((extras & EnsureExtras.DatasetId) == EnsureExtras.DatasetId)
-                datasetId = userInput.EnsureParam(datasetId, "Dataset Id", forceReEnter: ((reEnter & EnsureExtras.DatasetId) == EnsureExtras.DatasetId));
+                datasetId = userInput.EnsureParam(datasetId, "Dataset Id", forceReEnter: ((forceEntering & EnsureExtras.DatasetId) == EnsureExtras.DatasetId));
 
             if ((extras & EnsureExtras.GatewayId) == EnsureExtras.GatewayId)
-                gatewayId = userInput.EnsureParam(gatewayId, "Gateway Id", forceReEnter: ((reEnter & EnsureExtras.GatewayId) == EnsureExtras.GatewayId));
+                gatewayId = userInput.EnsureParam(gatewayId, "Gateway Id", forceReEnter: ((forceEntering & EnsureExtras.GatewayId) == EnsureExtras.GatewayId));
 
             if ((extras & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId)
-                datasourceId = userInput.EnsureParam(datasourceId, "Datasource Id", forceReEnter: ((reEnter & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId));
+                datasourceId = userInput.EnsureParam(datasourceId, "Datasource Id", forceReEnter: ((forceEntering & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId));
         }
 
         static async Task ProvisionNewWorkspaceCollection()
@@ -295,7 +295,7 @@ namespace ProvisionSample
         static async Task DeleteDataset()
         {
             // reset datasetId to force assignment 
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, EnsureExtras.DatasetId);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
             await DeleteDataset(workspaceCollectionName, workspaceId, datasetId);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Dataset deleted successfully.");
@@ -376,7 +376,7 @@ namespace ProvisionSample
 
         static async Task DeleteGateway()
         {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.GatewayId, EnsureExtras.GatewayId);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.GatewayId, forceEntering: EnsureExtras.GatewayId);
             await DeleteGateway(workspaceCollectionName, gatewayId);
             Console.WriteLine("Delete gateway id: {0} successfully", gatewayId);
             gatewayId = null;
@@ -410,6 +410,7 @@ namespace ProvisionSample
                 {
                     Console.WriteLine("Datasource Id:{0} connection details: {1}", ds.Id, ds.ConnectionDetails);
                 }
+                datasourceId = datasources.Last().Id;
             }
             else
             {
@@ -419,7 +420,7 @@ namespace ProvisionSample
 
         static async Task GetDatasourceById()
         {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.GatewayId | EnsureExtras.DatasourceId, EnsureExtras.DatasourceId);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.GatewayId | EnsureExtras.DatasourceId, forceEntering: EnsureExtras.DatasourceId);
             var datasource = await GetDatasource(workspaceCollectionName, gatewayId, datasourceId);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Gateway Id: {0}", gatewayId);
@@ -428,7 +429,7 @@ namespace ProvisionSample
 
         static async Task DeleteDatasource()
         {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.GatewayId | EnsureExtras.DatasourceId, EnsureExtras.DatasourceId);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.GatewayId | EnsureExtras.DatasourceId, forceEntering: EnsureExtras.DatasourceId);
             await DeleteDatasource(workspaceCollectionName, gatewayId, datasourceId);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Delete datasource id: {0} successfully", datasourceId);

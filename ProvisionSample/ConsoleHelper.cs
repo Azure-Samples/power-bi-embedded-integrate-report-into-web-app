@@ -185,19 +185,32 @@ namespace ProvisionSample
     {
         public static void PrintCommands(Commands commands)
         {
+            var color = ConsoleColor.Red;
             Console.WriteLine();
-            Console.WriteLine("What do you want to do (select prefix or numeric value)?");
+            Console.Write("What do you want to do (select ");
+            Console.ForegroundColor = color;
+            Console.Write("prefix/numeric");
+            Console.ResetColor();
+            Console.WriteLine(" value)?");
             Console.WriteLine("=================================================================");
-
             foreach (AdminCommands ac in Enum.GetValues(typeof(AdminCommands)))
             {
-                Console.WriteLine(ac.ToString());
+                WriteColoredStringLine(ac.ToString(), color,1);
             }
             for (int i = 0; i < commands.Count; i++)
             {
-                Console.WriteLine(string.Format("{0}. {1}", i, commands.GetCommandDescription(i)));
+                var numericSize = i < 9 ? 1 : ((i < 99)? 2 : 3);
+                WriteColoredStringLine(string.Format("{0}. {1}", i + 1, commands.GetCommandDescription(i)), color, numericSize);
             }
             Console.WriteLine();
+        }
+
+        public static void WriteColoredStringLine(string text, ConsoleColor color, int coloredChars)
+        {
+            Console.ForegroundColor = color;
+            Console.Write(text.Substring(0, coloredChars));
+            Console.ResetColor();
+            Console.WriteLine(text.Substring(coloredChars)); 
         }
 
         public static void WriteColoredValue(string desc, string param, ConsoleColor color, string restOfLine = null)
