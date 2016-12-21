@@ -137,6 +137,31 @@ namespace ProvisionSample
                 else
                     Console.WriteLine("Missing admin or numeric operations");
             }
+            catch (HttpOperationException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Ooops, something broke: {0}", ex.Message);
+                var error = SafeJsonConvert.DeserializeObject<PBIExceptionBody>(ex.Response.Content);
+                if (error != null && error.Error != null)
+                {
+                    if (error.Error.Details != null && error.Error.Details.FirstOrDefault() != null)
+                    {
+                        Console.WriteLine(error.Error.Details.FirstOrDefault().Message);
+                    }
+                    else if (error.Error.Code != null)
+                    {
+                        Console.WriteLine(error.Error.Code);
+                    }
+                }
+
+                IEnumerable<string> requestIds;
+                ex.Response.Headers.TryGetValue("RequestId", out requestIds);
+                if (requestIds != null && !string.IsNullOrEmpty(requestIds.FirstOrDefault()))
+                {
+                    Console.WriteLine("RequestId : {0}", requestIds.FirstOrDefault());
+                }
+                Console.WriteLine();
+            }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;

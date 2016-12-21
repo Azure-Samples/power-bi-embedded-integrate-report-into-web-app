@@ -78,6 +78,7 @@
     <Compile Include="AsyncPump.cs" />
     <Compile Include="ConsoleHelper.cs" />
     <Compile Include="Models\BillingUsage.cs" />
+    <Compile Include="Models\PBIExceptionBody.cs" />
     <Compile Include="Models\WorkspaceCollection.cs" />
     <Compile Include="Models\WorkspaceCollectionKeys.cs" />
     <Compile Include="Program.cs" />
