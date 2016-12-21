@@ -180,14 +180,11 @@ namespace ProvisionSample
             WorspaceId = 0x4,
             DatasetId = 0x8,
             DatasourceId = 0x10,
-
+            Azure = 0x12
         }
 
         static void EnsureBasicParams(EnsureExtras extras, EnsureExtras forceEntering = EnsureExtras.None)
         {
-            subscriptionId = userInput.EnsureParam(subscriptionId, "Azure Subscription Id", onlyFillIfEmpty: true);
-            resourceGroup = userInput.EnsureParam(resourceGroup, "Azure Resource Group", onlyFillIfEmpty: true);
-
             if ((extras & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection)
                 workspaceCollectionName = userInput.EnsureParam(workspaceCollectionName, "Workspace Collection Name", forceReEnter: ((forceEntering & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection));
 
@@ -202,12 +199,18 @@ namespace ProvisionSample
 
             if ((extras & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId)
                 datasourceId = userInput.EnsureParam(datasourceId, "Datasource Id", forceReEnter: ((forceEntering & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId));
+
+            if ((extras & EnsureExtras.Azure) == EnsureExtras.Azure)
+            {
+                subscriptionId = userInput.EnsureParam(subscriptionId, "Azure Subscription Id", onlyFillIfEmpty: true);
+                resourceGroup = userInput.EnsureParam(resourceGroup, "Azure Resource Group", onlyFillIfEmpty: true);
+            }
         }
 
         static async Task ProvisionNewWorkspaceCollection()
         {
             workspaceCollectionName = null;
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure);
 
             await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName);
             accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
@@ -218,7 +221,7 @@ namespace ProvisionSample
         static async Task ListWorkspaceCollections()
         {
 
-            EnsureBasicParams(EnsureExtras.None);
+            EnsureBasicParams(EnsureExtras.Azure);
 
             var workspaceCollections = await GetWorkspaceCollectionsList(subscriptionId, resourceGroup);
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -231,7 +234,7 @@ namespace ProvisionSample
 
         static async Task GetWorkspaceCollectionMetadata()
         {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure);
 
             var metadata = await GetWorkspaceCollectionMetadata(subscriptionId, resourceGroup, workspaceCollectionName);
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -240,7 +243,7 @@ namespace ProvisionSample
 
         static async Task ListWorkspaceCollectionApiKeys()
         {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection);
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure);
 
             accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             Console.ForegroundColor = ConsoleColor.Cyan;

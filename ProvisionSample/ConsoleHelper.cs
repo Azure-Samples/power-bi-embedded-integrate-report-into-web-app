@@ -78,7 +78,7 @@ namespace ProvisionSample
 
             if (available)
             {
-                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, forceReEnter ? ". Re-Enter same, or new value:" : ". Enter CR to use, or new value:");
+                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, forceReEnter ? ". Re-Enter same, or new value:" : ". Press enter to use, or give new value:");
             }
             else
             {
@@ -86,7 +86,7 @@ namespace ProvisionSample
             }
 
             var entered = Console.ReadLine();
-            if (!string.IsNullOrWhiteSpace(entered) || forceReEnter)
+            if (!string.IsNullOrWhiteSpace(entered))
             {
                 param = entered;
             }
