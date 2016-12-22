@@ -180,7 +180,7 @@ namespace ProvisionSample
             WorspaceId = 0x4,
             DatasetId = 0x8,
             DatasourceId = 0x10,
-            Azure = 0x12
+            Azure = 0x20
         }
 
         static void EnsureBasicParams(EnsureExtras extras, EnsureExtras forceEntering = EnsureExtras.None)
