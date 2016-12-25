@@ -75,24 +75,27 @@ namespace ProvisionSample
             commands.RegisterCommand("Get list of workspace collections", ListWorkspaceCollections);
             commands.RegisterCommand("Get workspace collection metadata", GetWorkspaceCollectionMetadata);
             commands.RegisterCommand("Get a workspace collection's API keys", ListWorkspaceCollectionApiKeys);
+            commands.RegisterCommand("Provision a new workspace collection", ProvisionNewWorkspaceCollection);
+
             commands.RegisterCommand("Get list of workspaces within a collection", ListWorkspacesInCollection);
+            commands.RegisterCommand("Provision a new workspace in an existing workspace collection", ProvisionNewWorkspace);
+
+            commands.RegisterCommand("Get a list of Datasets published to a workspace", ListDatasetInWorkspace);
+            commands.RegisterCommand("Import PBIX Desktop file into an existing workspace", ImportPBIX);
+            commands.RegisterCommand("Get status of import", GetImportStatus);
+            commands.RegisterCommand("Delete a published dataset from a workspace", DeleteDataset);
+            commands.RegisterCommand("Update connection string info for an existing dataset (Cloud only)", UpdateConnetionString);
+            
             commands.RegisterCommand("Get Gateways for workspace collection", ListGatewaysForWorkspaceCollection);
             commands.RegisterCommand("Get Gateways for workspace", ListGatewaysForWorkspace);
             commands.RegisterCommand("Get Gateway metadata", GetGatewayMetadata);
-            commands.RegisterCommand("Get a list of Datasets published to a workspace", ListDatasetInWorkspace);
+            commands.RegisterCommand("Delete Gateway by id", DeleteGateway);
+            commands.RegisterCommand("Bind Dataset to Gateway", BindDataset);
+
             commands.RegisterCommand("Get Datasources for gateway", ListDatasources);
             commands.RegisterCommand("Get Datasource by id", GetDatasourceById);
-            commands.RegisterCommand("Get status of import", GetImportStatus);
-            commands.RegisterCommand("Provision a new workspace collection", ProvisionNewWorkspaceCollection);
-            commands.RegisterCommand("Provision a new workspace in an existing workspace collection", ProvisionNewWorkspace);
-            commands.RegisterCommand("Import PBIX Desktop file into an existing workspace", ImportPBIX);
             commands.RegisterCommand("Create a new Datasource", CreateDatasource);
-            commands.RegisterCommand("Update connection string info for an existing dataset", UpdateConnetionString);
-            commands.RegisterCommand("Bind Dataset to Gateway", BindDataset);
             commands.RegisterCommand("Update Datasource", UpdateDatasource);
-            ////commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
-            commands.RegisterCommand("Delete a published dataset from a workspace", DeleteDataset);
-            commands.RegisterCommand("Delete Gateway by id", DeleteGateway);
             commands.RegisterCommand("Delete Datasource by id", DeleteDatasource);
         }
 
