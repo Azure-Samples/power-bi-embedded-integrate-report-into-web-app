@@ -9,7 +9,7 @@ namespace ProvisionSample
     /// </summary>
     public class Commands
     {
-        private List<Tuple<string, Func<Task>>> m_commands = new List<Tuple<string, Func<Task>>>();
+        private readonly List<Tuple<string, Func<Task>>> m_commands = new List<Tuple<string, Func<Task>>>();
 
         public void RegisterCommand(string description, Func<Task> operation)
         {
@@ -68,7 +68,7 @@ namespace ProvisionSample
     /// </summary>
     public class UserInput
     {
-        virtual public string EnsureParam(string param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false)
+        public virtual string EnsureParam(string param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false)
         {
             bool available = !string.IsNullOrWhiteSpace(param);
             if (onlyFillIfEmpty && available)
@@ -94,9 +94,9 @@ namespace ProvisionSample
             return param;
         }
 
-        virtual public string EnterOptionalParam(string desc, string SkipResultDescription)
+        public virtual string EnterOptionalParam(string desc, string skipResultDescription)
         {
-            Console.Write(desc + " (optional). Enter value (or CR to " + SkipResultDescription + "):");
+            ConsoleHelper.WriteColoredValue(desc + " (optional). Enter value (or press Enter to ", skipResultDescription, ConsoleColor.Magenta, "):");
 
             var entered = Console.ReadLine();
             Console.WriteLine();
@@ -107,14 +107,13 @@ namespace ProvisionSample
 
             return null;
         }
-        virtual public string ManageCachedParam(string param, string desc, bool forceReset = false)
+        public virtual string ManageCachedParam(string param, string desc, bool forceReset = false)
         {
             if (forceReset)
             {
                 return null;
             }
 
-            char ch;
             if (!string.IsNullOrWhiteSpace(param))
             {
                 ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'Y': To Reset, 'A': to assign, Any another key to skip:");
@@ -123,7 +122,7 @@ namespace ProvisionSample
             {
                 ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'A': to assign, Any another key to skip:");
             }
-            ch = Console.ReadKey().KeyChar;
+            var ch = Console.ReadKey().KeyChar;
             Console.WriteLine();
             if (ch == 'y' || ch == 'Y')
             {
@@ -137,7 +136,7 @@ namespace ProvisionSample
             return param;
         }
 
-        virtual public string GetPassword()
+        public virtual string GetPassword()
         {
             Console.Write("Password:");
             string password = ConsoleHelper.ReadPassword();
@@ -158,7 +157,7 @@ namespace ProvisionSample
                     continue;
                 }
 
-                int val = 0;
+                int val;
                 if (int.TryParse(command, out val))
                 {
                     numericCommand = val;
@@ -176,7 +175,6 @@ namespace ProvisionSample
                     }
                 }
                 Console.WriteLine("Illegal input. Try again");
-                continue;
             }
         }
     }
@@ -188,7 +186,7 @@ namespace ProvisionSample
     {
         public static void PrintCommands(Commands commands)
         {
-            var color = ConsoleColor.Red;
+            var color = ConsoleColor.Green;
             Console.WriteLine();
             Console.Write("What do you want to do (select ");
             Console.ForegroundColor = color;

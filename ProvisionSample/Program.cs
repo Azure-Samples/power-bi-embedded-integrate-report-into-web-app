@@ -565,18 +565,21 @@ namespace ProvisionSample
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
 
-            HttpClient client = new HttpClient();
+            const string defultRegion = "southcentralus";
+            string selectedRegion = userInput.EnterOptionalParam("Collection location", defultRegion);
+            var region = string.IsNullOrEmpty(selectedRegion) ? defultRegion : selectedRegion;
 
+            HttpClient client = new HttpClient();
             using (client)
             {
-                var content = new StringContent(@"{
-                                                ""location"": ""southcentralus"",
-                                                ""tags"": {},
-                                                ""sku"": {
+                var content = new StringContent($@"{{
+                                                ""location"": ""{region}"",
+                                                ""tags"": {{}},
+                                                ""sku"": {{
                                                     ""name"": ""S1"",
                                                     ""tier"": ""Standard""
-                                                }
-                                            }", Encoding.UTF8);
+                                                }}
+                                            }}", Encoding.UTF8);
                 content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=utf-8");
 
                 var request = new HttpRequestMessage(HttpMethod.Put, url);
