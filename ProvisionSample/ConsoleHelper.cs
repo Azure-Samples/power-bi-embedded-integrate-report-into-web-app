@@ -45,22 +45,22 @@ namespace ProvisionSample
         /// <summary>
         /// Exit application
         /// </summary>
-        Exit, 
+        ExitTool, 
 
         /// <summary>
         /// Clear cached parameters
         /// </summary>
-        ClearCache,
+        ClearSettings,
 
         /// <summary>
         /// iterate on all cached parameter to clear/re-assign/leave as is
         /// </summary>
-        ManageCache,
+        ManageSettings,
 
         /// <summary>
         /// Display all cached parameters
         /// </summary>
-        ShowCache,
+        DisplaySettings,
     };
 
     /// <summary>
@@ -116,23 +116,26 @@ namespace ProvisionSample
 
             if (!string.IsNullOrWhiteSpace(param))
             {
-                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'Y': To Reset, 'A': to assign, Any another key to skip:");
+                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'Y': to Reset, 'A': to assign, Q: to Quit, Any another key to skip:");
             }
             else 
             {
-                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'A': to assign, Any another key to skip:");
+                ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'A': to assign, Q: to Quit, Any another key to skip:");
             }
-            var ch = Console.ReadKey().KeyChar;
+            var ch = Char.ToUpper(Console.ReadKey().KeyChar);
             Console.WriteLine();
-            if (ch == 'y' || ch == 'Y')
+            switch (ch)
             {
-                return null;
+                case 'Y':
+                    return null;
+                case 'A':
+                    param = EnsureParam(null, desc);
+                    break;
+                case 'Q':
+                    throw new Exception(string.Format("Quit managing cache when on '{0}', value ={1}", desc, param));
+                default:
+                    break; 
             }
-            if (ch == 'a' || ch == 'A')
-            {
-                param = EnsureParam(null, desc);
-            }
-
             return param;
         }
 

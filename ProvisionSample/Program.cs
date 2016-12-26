@@ -25,6 +25,7 @@ namespace ProvisionSample
     {
         const string version = "?api-version=2016-01-29";
         const string armResource = "https://management.core.windows.net/";
+        const string defaultRegion = "southcentralus";
         static string clientId = "ea0616ba-638b-4df5-95b9-636659ae5121";
         static Uri redirectUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
 
@@ -72,19 +73,19 @@ namespace ProvisionSample
 
         static void SetupCommands()
         {
-            commands.RegisterCommand("Get list of workspace collections", ListWorkspaceCollections);
-            commands.RegisterCommand("Get workspace collection metadata", GetWorkspaceCollectionMetadata);
-            commands.RegisterCommand("Get a workspace collection's API keys", ListWorkspaceCollectionApiKeys);
-            commands.RegisterCommand("Provision a new workspace collection", ProvisionNewWorkspaceCollection);
+            commands.RegisterCommand("Get Workspace Collections", ListWorkspaceCollections);
+            commands.RegisterCommand("Get metadata for a Workspace Collection", GetWorkspaceCollectionMetadata);
+            commands.RegisterCommand("Get API keys for a  Workspace Collection", ListWorkspaceCollectionApiKeys);
+            commands.RegisterCommand("Provision a new Workspace Collection", ProvisionNewWorkspaceCollection);
 
-            commands.RegisterCommand("Get list of workspaces within a collection", ListWorkspacesInCollection);
-            commands.RegisterCommand("Provision a new workspace in an existing workspace collection", ProvisionNewWorkspace);
+            commands.RegisterCommand("Get Workspaces within a collection", ListWorkspacesInCollection);
+            commands.RegisterCommand("Provision a new Workspace", ProvisionNewWorkspace);
 
-            commands.RegisterCommand("Get a list of Datasets published to a workspace", ListDatasetInWorkspace);
-            commands.RegisterCommand("Import PBIX Desktop file into an existing workspace", ImportPBIX);
-            commands.RegisterCommand("Get status of import", GetImportStatus);
-            commands.RegisterCommand("Delete a published dataset from a workspace", DeleteDataset);
-            commands.RegisterCommand("Update connection string info for an existing dataset (Cloud only)", UpdateConnetionString);
+            commands.RegisterCommand("Get Datasets in a workspace", ListDatasetInWorkspace);
+            commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
+            commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
+            commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
+            commands.RegisterCommand("Update a Connection String for a dataset", UpdateConnetionString);
             
             commands.RegisterCommand("Get Gateways for workspace collection", ListGatewaysForWorkspaceCollection);
             commands.RegisterCommand("Get Gateways for workspace", ListGatewaysForWorkspace);
@@ -113,10 +114,10 @@ namespace ProvisionSample
                 {
                     switch (adminCommand.Value)
                     {
-                        case AdminCommands.Exit: return false;
-                        case AdminCommands.ClearCache: ManageCachedMetadata(forceReset: true); break;
-                        case AdminCommands.ManageCache: ManageCachedMetadata(forceReset: false); break;
-                        case AdminCommands.ShowCache: ShowCachedMetadata(); break;
+                        case AdminCommands.ExitTool: return false;
+                        case AdminCommands.ClearSettings: ManageCachedMetadata(forceReset: true); break;
+                        case AdminCommands.ManageSettings: ManageCachedMetadata(forceReset: false); break;
+                        case AdminCommands.DisplaySettings: ShowCachedMetadata(); break;
                     }
                 }
                 else if (numericCommand.HasValue)
@@ -171,7 +172,7 @@ namespace ProvisionSample
                 Console.WriteLine("Ooops, something broke: {0}", ex.Message);
                 Console.WriteLine();
             }
-            return (!adminCommand.HasValue || adminCommand.Value != AdminCommands.Exit);
+            return (!adminCommand.HasValue || adminCommand.Value != AdminCommands.ExitTool);
         }
 
         [Flags]
@@ -521,39 +522,47 @@ namespace ProvisionSample
 
         static void ManageCachedMetadata(bool forceReset)
         {
-            workspaceCollectionName = userInput.ManageCachedParam(workspaceCollectionName, "Workspace Collection Name", forceReset);
+            // ManageCachedParam may throw, to quit the management
+            try
+            {
+                workspaceCollectionName = userInput.ManageCachedParam(workspaceCollectionName, "Workspace Collection Name", forceReset);
 
-            string accessKeysKey1 = accessKeys != null ? accessKeys.Key1 : null;
-            accessKeysKey1 = userInput.ManageCachedParam(accessKeysKey1, "Workspace Collection Access Key1", forceReset);
-            if (accessKeysKey1 == null)
-            {
-                accessKeys = null;
-            }
-            else
-            {
-                accessKeys = new WorkspaceCollectionKeys
+                string accessKeysKey1 = accessKeys != null ? accessKeys.Key1 : null;
+                accessKeysKey1 = userInput.ManageCachedParam(accessKeysKey1, "Workspace Collection Access Key1", forceReset);
+                if (accessKeysKey1 == null)
                 {
-                    Key1 = accessKeysKey1
-                };
-            } 
+                    accessKeys = null;
+                }
+                else
+                {
+                    accessKeys = new WorkspaceCollectionKeys
+                    {
+                        Key1 = accessKeysKey1
+                    };
+                }
 
-            workspaceId = userInput.ManageCachedParam(workspaceId, "Workspace Id", forceReset);
-            gatewayId = userInput.ManageCachedParam(gatewayId, "Gateway Id", forceReset);
-            datasourceId = userInput.ManageCachedParam(datasourceId, "Datasource Id", forceReset);
-            datasetId = userInput.ManageCachedParam(datasetId, "Dataset Id", forceReset);
-            if (gatewayPublicKey != null)
-            {
-                string exponentAndModulus = "Exp:" + gatewayPublicKey.Exponent + " Mod:" + gatewayPublicKey.Modulus;
-                exponentAndModulus = userInput.ManageCachedParam(exponentAndModulus, "Gateway Public Key", forceReset);
-                if (string.IsNullOrWhiteSpace(exponentAndModulus))
+                workspaceId = userInput.ManageCachedParam(workspaceId, "Workspace Id", forceReset);
+                gatewayId = userInput.ManageCachedParam(gatewayId, "Gateway Id", forceReset);
+                datasourceId = userInput.ManageCachedParam(datasourceId, "Datasource Id", forceReset);
+                datasetId = userInput.ManageCachedParam(datasetId, "Dataset Id", forceReset);
+                if (gatewayPublicKey != null)
                 {
-                    gatewayPublicKey = null;
+                    string exponentAndModulus = "Exp:" + gatewayPublicKey.Exponent + " Mod:" + gatewayPublicKey.Modulus;
+                    exponentAndModulus = userInput.ManageCachedParam(exponentAndModulus, "Gateway Public Key", forceReset);
+                    if (string.IsNullOrWhiteSpace(exponentAndModulus))
+                    {
+                        gatewayPublicKey = null;
+                    }
+                }
+
+                if (forceReset)
+                {
+                    Console.WriteLine("Entire cache was reset\n");
                 }
             }
-
-            if (forceReset)
+            catch (Exception e)
             {
-                Console.WriteLine("Entire cache was reset\n");
+                Console.WriteLine("\n" + e.Message);
             }
         }
 
@@ -567,22 +576,19 @@ namespace ProvisionSample
         static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName)
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
-
-            const string defultRegion = "southcentralus";
-            string selectedRegion = userInput.EnterOptionalParam("Collection location", defultRegion);
-            var region = string.IsNullOrEmpty(selectedRegion) ? defultRegion : selectedRegion;
+            string region = userInput.EnsureParam(defaultRegion, "Collection location");
 
             HttpClient client = new HttpClient();
             using (client)
             {
-                var content = new StringContent($@"{{
-                                                ""location"": ""{region}"",
-                                                ""tags"": {{}},
-                                                ""sku"": {{
+                var content = new StringContent(@"{
+                                                ""location"": """ + region + @""",
+                                                ""tags"": {},
+                                                ""sku"": {
                                                     ""name"": ""S1"",
                                                     ""tier"": ""Standard""
-                                                }}
-                                            }}", Encoding.UTF8);
+                                                }
+                                            }", Encoding.UTF8);
                 content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=utf-8");
 
                 var request = new HttpRequestMessage(HttpMethod.Put, url);
