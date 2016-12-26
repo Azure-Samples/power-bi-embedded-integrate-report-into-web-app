@@ -39,6 +39,7 @@ namespace ProvisionSample
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
         static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
         static string datasetId = ConfigurationManager.AppSettings["datasetId"];
+        static string collectionLocation = defaultRegion;
         static Commands commands = new Commands();
         static WorkspaceCollectionKeys accessKeys = null;
         static GatewayPublicKey gatewayPublicKey = null;
@@ -184,7 +185,8 @@ namespace ProvisionSample
             WorspaceId = 0x4,
             DatasetId = 0x8,
             DatasourceId = 0x10,
-            Azure = 0x20
+            Azure = 0x20,
+            CollectionLocation = 0x40
         }
 
         static void EnsureBasicParams(EnsureExtras extras, EnsureExtras forceEntering = EnsureExtras.None)
@@ -209,14 +211,19 @@ namespace ProvisionSample
                 subscriptionId = userInput.EnsureParam(subscriptionId, "Azure Subscription Id", onlyFillIfEmpty: true);
                 resourceGroup = userInput.EnsureParam(resourceGroup, "Azure Resource Group", onlyFillIfEmpty: true);
             }
+            if ((extras & EnsureExtras.CollectionLocation) == EnsureExtras.CollectionLocation)
+                collectionLocation = userInput.EnsureParam(collectionLocation, "Collection location", forceReEnter: ((forceEntering & EnsureExtras.CollectionLocation) == EnsureExtras.CollectionLocation));
+
         }
 
         static async Task ProvisionNewWorkspaceCollection()
         {
+            // force new workspaceCollectionName, but if collectionLocation, set to the default, as users may be unaware of options
             workspaceCollectionName = null;
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure);
+            collectionLocation = collectionLocation ?? defaultRegion;
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure | EnsureExtras.CollectionLocation);
 
-            await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName);
+            await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName, collectionLocation);
             accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Workspace collection created successfully");
@@ -516,6 +523,7 @@ namespace ProvisionSample
             }
             else
                 ConsoleHelper.WriteColoredValue("gatewayPublicKey", null, ConsoleColor.Magenta, "\n");
+            ConsoleHelper.WriteColoredValue("CollectionLocation", collectionLocation, ConsoleColor.Magenta, "\n");
 
             Console.WriteLine();
         }
@@ -554,6 +562,7 @@ namespace ProvisionSample
                         gatewayPublicKey = null;
                     }
                 }
+                collectionLocation = userInput.ManageCachedParam(collectionLocation, "Collection Location", forceReset);
 
                 if (forceReset)
                 {
@@ -572,11 +581,11 @@ namespace ProvisionSample
         /// <param name="subscriptionId">The azure subscription id</param>
         /// <param name="resourceGroup">The azure resource group</param>
         /// <param name="workspaceCollectionName">The Power BI workspace collection name to create</param>
+        /// <param name="region">The Power BI region</param>
         /// <returns></returns>
-        static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName)
+        static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName, string region)
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
-            string region = userInput.EnsureParam(defaultRegion, "Collection location");
 
             HttpClient client = new HttpClient();
             using (client)
