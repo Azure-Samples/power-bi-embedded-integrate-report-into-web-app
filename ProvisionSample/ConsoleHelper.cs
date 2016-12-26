@@ -68,7 +68,7 @@ namespace ProvisionSample
     /// </summary>
     public class UserInput
     {
-        public virtual string EnsureParam(string param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false)
+        public virtual string EnsureParam(string param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false, bool isPassword = false)
         {
             bool available = !string.IsNullOrWhiteSpace(param);
             if (onlyFillIfEmpty && available)
@@ -85,7 +85,8 @@ namespace ProvisionSample
                 Console.Write(desc + " is required. Enter value:");
             }
 
-            var entered = Console.ReadLine();
+            var entered = isPassword ? ConsoleHelper.ReadPassword() : Console.ReadLine();
+
             if (!string.IsNullOrWhiteSpace(entered))
             {
                 param = entered;
@@ -137,14 +138,6 @@ namespace ProvisionSample
                     break; 
             }
             return param;
-        }
-
-        public virtual string GetPassword()
-        {
-            Console.Write("Password:");
-            string password = ConsoleHelper.ReadPassword();
-            Console.WriteLine();
-            return password;
         }
 
         public virtual void GetUserCommandSelection(out AdminCommands? adminCommand, out int? numericCommand)
@@ -252,6 +245,7 @@ namespace ProvisionSample
             // Stops Receving Keys Once Enter is Pressed
             while (key.Key != ConsoleKey.Enter);
 
+            Console.WriteLine();
             return password;
         }
     }

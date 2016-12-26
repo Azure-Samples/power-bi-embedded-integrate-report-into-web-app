@@ -76,7 +76,7 @@ namespace ProvisionSample
         {
             commands.RegisterCommand("Get Workspace Collections", ListWorkspaceCollections);
             commands.RegisterCommand("Get metadata for a Workspace Collection", GetWorkspaceCollectionMetadata);
-            commands.RegisterCommand("Get API keys for a  Workspace Collection", ListWorkspaceCollectionApiKeys);
+            commands.RegisterCommand("Get API keys for a Workspace Collection", ListWorkspaceCollectionApiKeys);
             commands.RegisterCommand("Provision a new Workspace Collection", ProvisionNewWorkspaceCollection);
 
             commands.RegisterCommand("Get Workspaces within a collection", ListWorkspacesInCollection);
@@ -813,7 +813,7 @@ namespace ProvisionSample
         static async Task UpdateConnection(string workspaceCollectionName, string workspaceId, string datasetId)
         {
             username = userInput.EnsureParam(username, "Username", onlyFillIfEmpty: true);
-            password = userInput.EnsureParam(password, "Password", onlyFillIfEmpty: true);
+            password = userInput.EnsureParam(password, "Password", onlyFillIfEmpty: true, isPassword: true);
 
             string connectionString = userInput.EnterOptionalParam("Connection String", "leave empty");
 
@@ -900,8 +900,8 @@ namespace ProvisionSample
             credentialDetails.CredentialType = str == "1" ? "Windows" : (str == "2" ? "Basic" : null);
             credentialDetails.EncryptionAlgorithm = "RSA-OAEP";
 
-            string username = userInput.EnsureParam(null, "Username");
-            string password = userInput.GetPassword();
+            username = userInput.EnsureParam(username, "Username", onlyFillIfEmpty: true);
+            password = userInput.EnsureParam(password, "Password", onlyFillIfEmpty: true, isPassword: true);
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
