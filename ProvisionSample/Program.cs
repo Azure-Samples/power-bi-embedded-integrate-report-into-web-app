@@ -86,7 +86,7 @@ namespace ProvisionSample
             commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
             commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
             commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
-            commands.RegisterCommand("Update a Connection String for a dataset", UpdateConnetionString);
+            commands.RegisterCommand("Update a Connection String for a dataset (Cloud only)", UpdateConnetionString);
             
             commands.RegisterCommand("Get Gateways for workspace collection", ListGatewaysForWorkspaceCollection);
             commands.RegisterCommand("Get Gateways for workspace", ListGatewaysForWorkspace);
@@ -104,12 +104,12 @@ namespace ProvisionSample
         static async Task<bool> Run()
         {
             Console.ResetColor();
-            int? numericCommand = null;
             AdminCommands? adminCommand = null;
             try
             {
                 ConsoleHelper.PrintCommands(commands);
 
+                int? numericCommand;
                 userInput.GetUserCommandSelection(out adminCommand, out numericCommand);
                 if (adminCommand.HasValue)
                 {
