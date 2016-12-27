@@ -81,6 +81,7 @@ namespace ProvisionSample
 
             commands.RegisterCommand("Get Workspaces within a collection", ListWorkspacesInCollection);
             commands.RegisterCommand("Provision a new Workspace", ProvisionNewWorkspace);
+            //commands.RegisterCommand("Delete Workspace by id", DeleteWorkspace);
 
             commands.RegisterCommand("Get Datasets in a workspace", ListDatasetInWorkspace);
             commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
@@ -192,7 +193,16 @@ namespace ProvisionSample
         static void EnsureBasicParams(EnsureExtras extras, EnsureExtras forceEntering = EnsureExtras.None)
         {
             if ((extras & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection)
-                workspaceCollectionName = userInput.EnsureParam(workspaceCollectionName, "Workspace Collection Name", forceReEnter: ((forceEntering & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection));
+            {
+                var newWorkspaceCollectionName = userInput.EnsureParam(workspaceCollectionName, "Workspace Collection Name", forceReEnter: ((forceEntering & EnsureExtras.WorkspaceCollection) == EnsureExtras.WorkspaceCollection));
+                if (!newWorkspaceCollectionName.Equals(workspaceCollectionName))
+                {
+                    accessKeys = null;
+                    accessKey = null;
+                }
+
+                workspaceCollectionName = newWorkspaceCollectionName;
+            }
 
             if ((extras & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId)
                 workspaceId = userInput.EnsureParam(workspaceId, "Workspace Id", forceReEnter: ((forceEntering & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId));
@@ -201,7 +211,20 @@ namespace ProvisionSample
                 datasetId = userInput.EnsureParam(datasetId, "Dataset Id", forceReEnter: ((forceEntering & EnsureExtras.DatasetId) == EnsureExtras.DatasetId));
 
             if ((extras & EnsureExtras.GatewayId) == EnsureExtras.GatewayId)
-                gatewayId = userInput.EnsureParam(gatewayId, "Gateway Id", forceReEnter: ((forceEntering & EnsureExtras.GatewayId) == EnsureExtras.GatewayId));
+            {
+                var newGatewayId = userInput.EnsureParam(gatewayId, "Gateway Id", forceReEnter: ((forceEntering & EnsureExtras.GatewayId) == EnsureExtras.GatewayId));
+                if (!newGatewayId.Equals(gatewayId))
+                {
+                    var exponent = userInput.EnsureParam(gatewayId, "Gateway PublicKey exponent");
+                    var modulus = userInput.EnsureParam(gatewayId, "Gateway PublicKey modulus");
+                    if (!string.IsNullOrEmpty(exponent) && !string.IsNullOrEmpty(modulus))
+                    {
+                        gatewayPublicKey = new GatewayPublicKey(exponent, modulus);
+                    }
+                }
+
+                gatewayId = newGatewayId;
+            }
 
             if ((extras & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId)
                 datasourceId = userInput.EnsureParam(datasourceId, "Datasource Id", forceReEnter: ((forceEntering & EnsureExtras.DatasourceId) == EnsureExtras.DatasourceId));
@@ -290,6 +313,15 @@ namespace ProvisionSample
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Workspace Id: {0}", workspaceId);
         }
+
+        //static async Task DeleteWorkspace()
+        //{
+        //    EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId, forceEntering:EnsureExtras.WorspaceId);
+
+        //    var result = await DeleteWorkspace(workspaceCollectionName, workspaceId);
+        //    Console.ForegroundColor = ConsoleColor.Cyan;
+        //    Console.WriteLine("Result: {0}", result);
+        //}
 
         static async Task ImportPBIX()
         {
@@ -725,6 +757,20 @@ namespace ProvisionSample
         }
 
         /// <summary>
+        /// Deletes Power BI Embedded workspace within the specified collection
+        /// </summary>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
+        /// <returns></returns>
+        //static async Task<Workspace> DeleteWorkspace(string workspaceCollectionName, string workspaceid)
+        //{
+        //    using (var client = await CreateClient())
+        //    {
+        //        // Delete a workspace witin the specified collection
+        //        return await client.Workspaces.DeleteWorkspaceAsync(workspaceCollectionName, workspaceid);
+        //    }
+        //}
+
+        /// <summary>
         /// Gets a list of Power BI Embedded workspaces within the specified collection
         /// </summary>
         /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
@@ -951,7 +997,17 @@ namespace ProvisionSample
                 return null;
             }
             request.DataSourceType = str == "1" ? "SQL" : "AnalysisServices";
-            request.ConnectionDetails = userInput.EnsureParam(null, "Connection Details: ex: {\"server\":\"<your server>\",\"database\":\"<your database>\"}");
+            var server = userInput.EnsureParam(null, "Server:");
+            if (string.IsNullOrEmpty(server))
+            {
+                return null;
+            }
+            var database = userInput.EnsureParam(null, "Database:");
+            if (string.IsNullOrEmpty(database))
+            {
+                return null;
+            }
+            request.ConnectionDetails = string.Format("{{\"server\":{0},\"database\":{1}}}", JsonConvert.SerializeObject(server), JsonConvert.SerializeObject(database));
 
             request.CredentialDetails = await GetCredentialDetailsFromUser(workspaceCollectionName, gatewayId);
             if (request.CredentialDetails == null)
