@@ -45,7 +45,7 @@ namespace ProvisionSample
         /// <summary>
         /// Exit application
         /// </summary>
-        ExitTool, 
+        ExitTool,
 
         /// <summary>
         /// Clear cached parameters
@@ -68,6 +68,37 @@ namespace ProvisionSample
     /// </summary>
     public class UserInput
     {
+        public virtual int? EnsureIntParam(int? param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false)
+        {
+            bool available = param.HasValue;
+            if (onlyFillIfEmpty && available)
+            {
+                return param;
+            }
+
+            if (available)
+            {
+                ConsoleHelper.WriteColoredValue(desc, param.Value.ToString(), ConsoleColor.Magenta, forceReEnter ? ". Re-Enter same, or new int value:" : ". Press enter to use, or give new int value:");
+            }
+            else
+            {
+                Console.Write(desc + " is required. Enter int value:");
+            }
+
+            var entered = Console.ReadLine();
+            int val;
+            if (!string.IsNullOrWhiteSpace(entered))
+            {
+                if (!Int32.TryParse(entered, out val))
+                {
+                    Console.WriteLine("illegal int value:[" + entered + "]");
+                    return null;
+                }
+                param = val;
+            }
+            return null;
+        }
+
         public virtual string EnsureParam(string param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false, bool isPassword = false)
         {
             bool available = !string.IsNullOrWhiteSpace(param);
@@ -119,7 +150,7 @@ namespace ProvisionSample
             {
                 ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'Y': to Reset, 'A': to assign, Q: to Quit, Any another key to skip:");
             }
-            else 
+            else
             {
                 ConsoleHelper.WriteColoredValue(desc, param, ConsoleColor.Magenta, ". Enter 'A': to assign, Q: to Quit, Any another key to skip:");
             }
@@ -135,7 +166,7 @@ namespace ProvisionSample
                 case 'Q':
                     throw new Exception(string.Format("Quit managing cache when on '{0}', value ={1}", desc, param));
                 default:
-                    break; 
+                    break;
             }
             return param;
         }
@@ -192,12 +223,14 @@ namespace ProvisionSample
             Console.WriteLine("=================================================================");
             foreach (AdminCommands ac in Enum.GetValues(typeof(AdminCommands)))
             {
-                WriteColoredStringLine(ac.ToString(), color,1);
+                WriteColoredStringLine(ac.ToString(), color, 1);
             }
+            Console.WriteLine();
             for (int i = 0; i < commands.Count; i++)
             {
-                var numericSize = i < 9 ? 1 : ((i < 99)? 2 : 3);
-                WriteColoredStringLine(string.Format("{0}. {1}", i + 1, commands.GetCommandDescription(i)), color, numericSize);
+                var numericSize = i < 9 ? 1 : ((i < 99) ? 2 : 3);
+                var align = i < 9 ? " " : "";
+                WriteColoredStringLine(string.Format("{0} {1} {2}", i + 1, align, commands.GetCommandDescription(i)), color, numericSize);
             }
             Console.WriteLine();
         }
@@ -207,7 +240,7 @@ namespace ProvisionSample
             Console.ForegroundColor = color;
             Console.Write(text.Substring(0, coloredChars));
             Console.ResetColor();
-            Console.WriteLine(text.Substring(coloredChars)); 
+            Console.WriteLine(text.Substring(coloredChars));
         }
 
         public static void WriteColoredValue(string desc, string param, ConsoleColor color, string restOfLine = null)

@@ -10,24 +10,21 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ApiHost.Models;
-using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.PowerBI.Api.V1;
 using Microsoft.PowerBI.Api.V1.Models;
+using Microsoft.PowerBI.Security;
 using Microsoft.Rest;
 using Microsoft.Rest.Serialization;
 using Microsoft.Threading;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace ProvisionSample
 {
-    class Program
+    partial class Program
     {
         const string version = "?api-version=2016-01-29";
         const string armResource = "https://management.core.windows.net/";
         const string defaultRegion = "southcentralus";
-        static string clientId = "ea0616ba-638b-4df5-95b9-636659ae5121";
-        static Uri redirectUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
 
         static string apiEndpointUri = ConfigurationManager.AppSettings["powerBiApiEndpoint"];
         static string azureEndpointUri = ConfigurationManager.AppSettings["azureApiEndpoint"];
@@ -45,7 +42,6 @@ namespace ProvisionSample
         static GatewayPublicKey gatewayPublicKey = null;
         static string gatewayId = null;
         static string datasourceId = null;
-        static string azureToken = null;
         static UserInput userInput = null;
 
         static void Main(string[] args)
@@ -88,7 +84,7 @@ namespace ProvisionSample
             commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
             commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
             commands.RegisterCommand("Update a Connection String for a dataset (Cloud only)", UpdateConnetionString);
-            
+
             commands.RegisterCommand("Get Gateways for workspace collection", ListGatewaysForWorkspaceCollection);
             commands.RegisterCommand("Get Gateways for workspace", ListGatewaysForWorkspace);
             commands.RegisterCommand("Get Gateway metadata", GetGatewayMetadata);
@@ -100,6 +96,9 @@ namespace ProvisionSample
             commands.RegisterCommand("Create a new Datasource", CreateDatasource);
             commands.RegisterCommand("Update Datasource", UpdateDatasource);
             commands.RegisterCommand("Delete Datasource by id", DeleteDatasource);
+
+            commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
+
         }
 
         static async Task<bool> Run()
@@ -147,6 +146,7 @@ namespace ProvisionSample
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("Ooops, something broke: {0}", ex.Message);
+
                 var error = SafeJsonConvert.DeserializeObject<PBIExceptionBody>(ex.Response.Content);
                 if (error != null && error.Error != null)
                 {
@@ -203,7 +203,6 @@ namespace ProvisionSample
 
                 workspaceCollectionName = newWorkspaceCollectionName;
             }
-
             if ((extras & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId)
                 workspaceId = userInput.EnsureParam(workspaceId, "Workspace Id", forceReEnter: ((forceEntering & EnsureExtras.WorspaceId) == EnsureExtras.WorspaceId));
 
@@ -234,6 +233,7 @@ namespace ProvisionSample
                 subscriptionId = userInput.EnsureParam(subscriptionId, "Azure Subscription Id", onlyFillIfEmpty: true);
                 resourceGroup = userInput.EnsureParam(resourceGroup, "Azure Resource Group", onlyFillIfEmpty: true);
             }
+
             if ((extras & EnsureExtras.CollectionLocation) == EnsureExtras.CollectionLocation)
                 collectionLocation = userInput.EnsureParam(collectionLocation, "Collection location", forceReEnter: ((forceEntering & EnsureExtras.CollectionLocation) == EnsureExtras.CollectionLocation));
 
@@ -263,6 +263,11 @@ namespace ProvisionSample
             foreach (WorkspaceCollection instance in workspaceCollections)
             {
                 Console.WriteLine("Collection: {0}", instance.Name);
+            }
+
+            if (workspaceCollections.Any())
+            {
+                workspaceCollectionName = workspaceCollections.Last().Name;
             }
         }
 
@@ -336,13 +341,51 @@ namespace ProvisionSample
 
         static async Task UpdateConnetionString()
         {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
-            var datasetId = userInput.EnsureParam(null, "Dataset Id");
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
 
             await UpdateConnection(workspaceCollectionName, workspaceId, datasetId);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Connection information updated successfully.");
         }
+
+        static async Task GetEmbedInfo()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+            int? index = -1;
+
+            IList<Report> reports = await GetReports(workspaceCollectionName, workspaceId);
+            if (reports == null || !reports.Any())
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("No report found in Workspace {0} from WorkspaceCollection {1}", workspaceId, workspaceCollectionName);
+                return;
+            }
+
+            Console.WriteLine("Existing reports:");
+            for (int i = 0; i < reports.Count; i++)
+                ConsoleHelper.WriteColoredStringLine(string.Format("{0} report name:{1}, Id:{2}", i + 1, reports[i].Name, reports[i].Id), ConsoleColor.Green, 2);
+            Console.WriteLine();
+
+            index = userInput.EnsureIntParam(index, "Index of report to use (-1 for last in list)");
+            if (!index.HasValue)
+            {
+                index = -1;
+            }
+            if (!index.HasValue || index.Value <= 0 || index.Value > reports.Count)
+                index = reports.Count;
+
+            Report report = reports[index.Value - 1];
+            // var embedToken = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, report.Id, DateTime.UtcNow.AddYears(2));
+            var embedToken = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, report.Id);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Embed Url: {0}", report.EmbedUrl);
+            Console.WriteLine("Embed Token: {0}", embedToken.Generate(accessKeys.Key1));
+            var embedToken2 = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, report.Id);
+            embedToken2.Claims.Add(new System.Security.Claims.Claim("type", "embed"));
+            Console.WriteLine("Fixed Token: {0}", embedToken2.Generate(accessKeys.Key1));
+        }
+
+
 
         static async Task ListDatasetInWorkspace()
         {
@@ -543,7 +586,7 @@ namespace ProvisionSample
             ConsoleHelper.WriteColoredValue("Workspace Collection Name", workspaceCollectionName, ConsoleColor.Magenta, "\n");
             var usedAccessKey = (accessKeys == null) ? null : accessKeys.Key1;
             ConsoleHelper.WriteColoredValue("Workspace Collection Access Key1", usedAccessKey, ConsoleColor.Magenta, "\n");
- 
+
             ConsoleHelper.WriteColoredValue("Workspace Id", workspaceId, ConsoleColor.Magenta, "\n");
             ConsoleHelper.WriteColoredValue("Gateway Id", gatewayId, ConsoleColor.Magenta, "\n");
             ConsoleHelper.WriteColoredValue("DatasourceId", datasourceId, ConsoleColor.Magenta, "\n");
@@ -619,7 +662,8 @@ namespace ProvisionSample
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
 
-            HttpClient client = new HttpClient();
+            HttpClient client = CreateHttpClient();
+
             using (client)
             {
                 var content = new StringContent(@"{
@@ -633,8 +677,9 @@ namespace ProvisionSample
                 content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=utf-8");
 
                 var request = new HttpRequestMessage(HttpMethod.Put, url);
-                // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
+                // Set authorization header from your acquired Azure AD token
+                await SetAuthorizationHeaderIfNeeded(request);
+
                 request.Content = content;
 
                 var response = await client.SendAsync(request);
@@ -654,12 +699,14 @@ namespace ProvisionSample
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections{3}", azureEndpointUri, subscriptionId, resourceGroup, version);
 
-            HttpClient client = new HttpClient();
+            HttpClient client = CreateHttpClient();
+
             using (client)
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
+                // Set authorization header from your acquired Azure AD token
+                await SetAuthorizationHeaderIfNeeded(request);
+
                 var response = await client.SendAsync(request);
 
                 if (response.StatusCode != HttpStatusCode.OK)
@@ -685,13 +732,14 @@ namespace ProvisionSample
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}/listkeys{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
 
-            HttpClient client = new HttpClient();
+            HttpClient client = CreateHttpClient();
 
             using (client)
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
-                // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
+                // Set authorization header from your acquired Azure AD token
+                await SetAuthorizationHeaderIfNeeded(request);
+
                 request.Content = new StringContent(string.Empty);
                 var response = await client.SendAsync(request);
 
@@ -717,13 +765,14 @@ namespace ProvisionSample
         static async Task<string> GetWorkspaceCollectionMetadata(string subscriptionId, string resourceGroup, string workspaceCollectionName)
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
-            HttpClient client = new HttpClient();
+            HttpClient client = CreateHttpClient();
 
             using (client)
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                // Set authorization header from you acquired Azure AD token
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
+                // Set authorization header from your acquired Azure AD token
+                await SetAuthorizationHeaderIfNeeded(request);
+
                 var response = await client.SendAsync(request);
 
                 if (response.StatusCode != HttpStatusCode.OK)
@@ -858,8 +907,12 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task UpdateConnection(string workspaceCollectionName, string workspaceId, string datasetId)
         {
-            username = userInput.EnsureParam(username, "Username", onlyFillIfEmpty: true);
-            password = userInput.EnsureParam(password, "Password", onlyFillIfEmpty: true, isPassword: true);
+            var chachedUsername = username;
+            username = userInput.EnsureParam(username, "Username", onlyFillIfEmpty: false);
+            if (username != chachedUsername)
+            {
+                password = userInput.EnsureParam(null, "Password", onlyFillIfEmpty: false, isPassword: true);
+            }
 
             string connectionString = userInput.EnterOptionalParam("Connection String", "leave empty");
 
@@ -1070,6 +1123,36 @@ namespace ProvisionSample
             }
         }
 
+        /// <summary>
+        /// Get the single report out of the list of existing ones
+        /// </summary>
+        /// <param name="workspaceCollectionName"></param>
+        /// <param name="workspaceId"></param>
+        /// <param name="index">which, 0..n for specific, -1 for last if n > number of reports then last</param>
+        /// <returns></returns>
+        static async Task<Report> GetReport(string workspaceCollectionName, string workspaceId, int index = -1)
+        {
+            using (var client = await CreateClient())
+            {
+                var reports = await client.Reports.GetReportsAsync(workspaceCollectionName, workspaceId);
+                if (reports.Value.Any())
+                {
+                    index = ((index < 0) || ((reports.Value.Count - 1) < index)) ? reports.Value.Count - 1 : index;
+                    return reports.Value[index];
+                }
+            }
+            return null;
+        }
+
+        static async Task<IList<Report>> GetReports(string workspaceCollectionName, string workspaceId)
+        {
+            using (var client = await CreateClient())
+            {
+                var reports = await client.Reports.GetReportsAsync(workspaceCollectionName, workspaceId);
+                return reports.Value;
+            }
+        }
+
         static async Task EnsureGatewayPublicKey(string workspaceCollectionName, string gatewayId)
         {
             if (gatewayPublicKey == null)
@@ -1086,104 +1169,6 @@ namespace ProvisionSample
             {
                 gatewayPublicKey = (await GetGatewayById(workspaceCollectionName, gatewayId)).PublicKey;
             }
-        }
-
-        /// <summary>
-        /// Creates a new instance of the PowerBIClient with the specified token
-        /// </summary>
-        /// <returns></returns>
-        static async Task<PowerBIClient> CreateClient()
-        {
-            if (accessKeys == null)
-            {
-                var enteredKey = userInput.EnterOptionalParam("Access Key", "Auto select");
-                if (!string.IsNullOrWhiteSpace(enteredKey))
-                {
-                    accessKey = enteredKey;
-                    accessKeys = new WorkspaceCollectionKeys()
-                    {
-                        Key1 = accessKey
-                    };
-                }
-            }
-
-            if (accessKeys == null)
-            {
-                // get the current collection's keys
-                accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
-            }
-
-            // Create a token credentials with "AppKey" type
-            var credentials = new TokenCredentials(accessKeys.Key1, "AppKey");
-
-            // Instantiate your Power BI client passing in the required credentials
-            var client = new PowerBIClient(credentials);
-
-            // Override the api endpoint base URL.  Default value is https://api.powerbi.com
-            client.BaseUri = new Uri(apiEndpointUri);
-
-            return client;
-        }
-
-        static async Task<IEnumerable<string>> GetTenantIdsAsync(string commonToken)
-        {
-            using (var httpClient = new HttpClient())
-            {
-                httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + commonToken);
-                var response = await httpClient.GetStringAsync("https://management.azure.com/tenants?api-version=2016-01-29");
-                var tenantsJson = JsonConvert.DeserializeObject<JObject>(response);
-                var tenants = tenantsJson["value"] as JArray;
-
-                return tenants.Select(t => t["tenantId"].Value<string>());
-            }
-        }
-
-        /// <summary>
-        /// Gets an Azure access token that can be used to call into the Azure ARM apis.
-        /// </summary>
-        /// <returns>A user token to access Azure ARM</returns>
-        static async Task<string> GetAzureAccessTokenAsync()
-        {
-            if (!string.IsNullOrWhiteSpace(azureToken))
-            {
-                return azureToken;
-            }
-
-            var commonToken = GetCommonAzureAccessToken();
-            var tenantId = (await GetTenantIdsAsync(commonToken.AccessToken)).FirstOrDefault();
-
-            if (string.IsNullOrWhiteSpace(tenantId))
-            {
-                throw new InvalidOperationException("Unable to get tenant id for user accout");
-            }
-
-            var authority = string.Format("https://login.windows.net/{0}/oauth2/authorize", tenantId);
-            var authContext = new AuthenticationContext(authority);
-            var result = await authContext.AcquireTokenByRefreshTokenAsync(commonToken.RefreshToken, clientId, armResource);
-
-            return (azureToken = result.AccessToken);
-
-        }
-
-        /// <summary>
-        /// Gets a user common access token to access ARM apis
-        /// </summary>
-        /// <returns></returns>
-        static AuthenticationResult GetCommonAzureAccessToken()
-        {
-            var authContext = new AuthenticationContext("https://login.windows.net/common/oauth2/authorize");
-            var result = authContext.AcquireToken(
-                resource: armResource,
-                clientId: clientId,
-                redirectUri: redirectUri,
-                promptBehavior: PromptBehavior.Auto);
-
-            if (result == null)
-            {
-                throw new InvalidOperationException("Failed to obtain the JWT token");
-            }
-
-            return result;
         }
     }
 }
