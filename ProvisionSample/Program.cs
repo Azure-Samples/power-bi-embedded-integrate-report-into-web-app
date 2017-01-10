@@ -23,15 +23,19 @@ namespace ProvisionSample
 {
     class Program
     {
-        const string version = "?api-version=2016-01-29";
-        const string armResource = "https://management.core.windows.net/";
-        static string clientId = "ea0616ba-638b-4df5-95b9-636659ae5121";
+
         static Uri redirectUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
 
+        static string clientId = ConfigurationManager.AppSettings["clientId"];
+        static string authUrl = ConfigurationManager.AppSettings["AuthenticationUrl"];
+        static string version = ConfigurationManager.AppSettings["apiVersion"];
+        static string armResource = ConfigurationManager.AppSettings["armResource"];
         static string apiEndpointUri = ConfigurationManager.AppSettings["powerBiApiEndpoint"];
         static string azureEndpointUri = ConfigurationManager.AppSettings["azureApiEndpoint"];
         static string subscriptionId = ConfigurationManager.AppSettings["subscriptionId"];
         static string resourceGroup = ConfigurationManager.AppSettings["resourceGroup"];
+        static string tenantsUrl = ConfigurationManager.AppSettings["tenantsUrl"];
+
         static string workspaceCollectionName = ConfigurationManager.AppSettings["workspaceCollectionName"];
         static string username = ConfigurationManager.AppSettings["username"];
         static string password = ConfigurationManager.AppSettings["password"];
@@ -366,14 +370,7 @@ namespace ProvisionSample
 
             using (client)
             {
-                var content = new StringContent(@"{
-                                                ""location"": ""southcentralus"",
-                                                ""tags"": {},
-                                                ""sku"": {
-                                                    ""name"": ""S1"",
-                                                    ""tier"": ""Standard""
-                                                }
-                                            }", Encoding.UTF8);
+                var content = getContentByCloud();
                 content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=utf-8");
 
                 var request = new HttpRequestMessage(HttpMethod.Put, url);
@@ -665,7 +662,7 @@ namespace ProvisionSample
             using (var httpClient = new HttpClient())
             {
                 httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + commonToken);
-                var response = await httpClient.GetStringAsync("https://management.azure.com/tenants?api-version=2016-01-29");
+                var response = await httpClient.GetStringAsync(tenantsUrl);
                 var tenantsJson = JsonConvert.DeserializeObject<JObject>(response);
                 var tenants = tenantsJson["value"] as JArray;
 
@@ -685,14 +682,14 @@ namespace ProvisionSample
             }
 
             var commonToken = GetCommonAzureAccessToken();
-            var tenantId = (await GetTenantIdsAsync(commonToken.AccessToken)).FirstOrDefault();
 
+            var tenantId = (await GetTenantIdsAsync(commonToken.AccessToken)).FirstOrDefault();
             if (string.IsNullOrWhiteSpace(tenantId))
             {
                 throw new InvalidOperationException("Unable to get tenant id for user accout");
             }
 
-            var authority = string.Format("https://login.windows.net/{0}/oauth2/authorize", tenantId);
+            var authority = string.Format("{0}/{1}/oauth2/authorize", authUrl, tenantId);
             var authContext = new AuthenticationContext(authority);
             var result = await authContext.AcquireTokenByRefreshTokenAsync(commonToken.RefreshToken, clientId, armResource);
 
@@ -706,7 +703,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static AuthenticationResult GetCommonAzureAccessToken()
         {
-            var authContext = new AuthenticationContext("https://login.windows.net/common/oauth2/authorize");
+            var authContext = new AuthenticationContext(string.Format("{0}/common/oauth2/authorize", authUrl));
             var result = authContext.AcquireToken(
                 resource: armResource,
                 clientId: clientId,
@@ -719,6 +716,35 @@ namespace ProvisionSample
             }
 
             return result;
+        }
+
+        static StringContent getContentByCloud()
+        {
+            StringContent content;
+            string cloud = apiEndpointUri.Split('.')[2];
+            if (cloud == "com")
+            {
+                content = new StringContent(@"{
+                                                ""location"": ""southcentralus"",
+                                                ""tags"": {},
+                                                ""sku"": {
+                                                    ""name"": ""S1"",
+                                                    ""tier"": ""Standard""
+                                                }
+                                            }", Encoding.UTF8);
+            }
+            else
+            {
+                content = new StringContent(@"{
+                                                ""location"": ""chinanorth"",
+                                                ""tags"": {},
+                                                ""sku"": {
+                                                    ""name"": ""S1"",
+                                                    ""tier"": ""Standard""
+                                                }
+                                            }", Encoding.UTF8);
+            }
+            return content;
         }
     }
 }

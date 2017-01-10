@@ -503,6 +503,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	        if (typeof embedUrl !== 'string' || embedUrl.length === 0) {
 	            throw new Error("Embed Url is required, but it was not found. You must provide an embed url either as part of embed configuration or as attribute '" + Embed.embedUrlAttribute + "'.");
 	        }
+	        var cloud = document.getElementById(Embed.cloudAttribute).getAttribute(Embed.cloudAttribute);
+	        if (cloud == "cn") {
+	            embedUrl = embedUrl.replace(".com", ".cn");
+	        }
 	        return embedUrl;
 	    };
 	    /**
@@ -547,6 +551,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Embed.allowedEvents = ["loaded"];
 	    Embed.accessTokenAttribute = 'powerbi-access-token';
 	    Embed.embedUrlAttribute = 'powerbi-embed-url';
+	    Embed.cloudAttribute = 'power_bi_cloud';
 	    Embed.nameAttribute = 'powerbi-name';
 	    Embed.typeAttribute = 'powerbi-type';
 	    Embed.defaultSettings = {

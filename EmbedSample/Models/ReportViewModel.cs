@@ -12,5 +12,8 @@ namespace paas_demo.Models
         public Report Report { get; set; }
 
         public string AccessToken { get; set; }
+
+        public string Cloud { get; set;}
+
     }
 }
