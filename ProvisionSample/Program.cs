@@ -17,6 +17,7 @@ using Microsoft.Rest;
 using Microsoft.Rest.Serialization;
 using Microsoft.Threading;
 using Newtonsoft.Json;
+using ProvisionSample.Models;
 
 namespace ProvisionSample
 {
@@ -98,6 +99,7 @@ namespace ProvisionSample
             commands.RegisterCommand("Delete Datasource by id", DeleteDatasource);
 
             commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
+            commands.RegisterCommand("Get billing info", GetBillingInfo);
 
         }
 
@@ -385,7 +387,14 @@ namespace ProvisionSample
             Console.WriteLine("Fixed Token: {0}", embedToken2.Generate(accessKeys.Key1));
         }
 
+        static async Task GetBillingInfo()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure);
 
+            var billInfo = await GetBillingUsage(subscriptionId, resourceGroup, workspaceCollectionName);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Renders: {0}", billInfo.Renders);
+        }
 
         static async Task ListDatasetInWorkspace()
         {
@@ -783,6 +792,33 @@ namespace ProvisionSample
 
                 var json = await response.Content.ReadAsStringAsync();
                 return json;
+            }
+        }
+
+        static async Task<BillingUsage> GetBillingUsage(string subscriptionId, string resourceGroup, string workspaceCollectionName)
+        {
+            var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}/billingUsage{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
+
+            HttpClient client = CreateHttpClient();
+
+            using (client)
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                // Set authorization header from your acquired Azure AD token
+                await SetAuthorizationHeaderIfNeeded(request);
+
+                request.Content = new StringContent(string.Empty);
+                var response = await client.SendAsync(request);
+
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    var responseText = await response.Content.ReadAsStringAsync();
+                    var message = string.Format("Status: {0}, Reason: {1}, Message: {2}", response.StatusCode, response.ReasonPhrase, responseText);
+                    throw new Exception(message);
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                return SafeJsonConvert.DeserializeObject<BillingUsage>(json);
             }
         }
 
