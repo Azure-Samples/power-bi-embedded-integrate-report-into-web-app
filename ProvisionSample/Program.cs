@@ -334,25 +334,26 @@ namespace ProvisionSample
             catch (HttpOperationException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Ooops, something broke: {0}", ex.Message);
+                Console.WriteLine("Error message: {0}", ex.Message);
                 var error = SafeJsonConvert.DeserializeObject<PBIExceptionBody>(ex.Response.Content);
                 if (error != null && error.Error != null)
                 {
-                    if (error.Error.Details != null && error.Error.Details.FirstOrDefault() != null)
+                    if (error.Error.Details != null && error.Error.Details.Any())
                     {
-                        Console.WriteLine(error.Error.Details.FirstOrDefault().Message);
+                        Console.WriteLine(error.Error.Details.First().Message);
                     }
-                    else if (error.Error.Code != null)
+
+                    if (!string.IsNullOrEmpty(error.Error.Code))
                     {
                         Console.WriteLine(error.Error.Code);
                     }
                 }
 
                 IEnumerable<string> requestIds;
-                ex.Response.Headers.TryGetValue("RequestId", out requestIds);
-                if (requestIds != null && !string.IsNullOrEmpty(requestIds.FirstOrDefault()))
+                var result = ex.Response.Headers.TryGetValue("RequestId", out requestIds);
+                if (result && requestIds != null && requestIds.Any())
                 {
-                    Console.WriteLine("RequestId : {0}", requestIds.FirstOrDefault());
+                    Console.WriteLine("RequestId : {0}", requestIds.First());
                 }
                 Console.WriteLine();
             }
