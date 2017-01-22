@@ -1,23 +1,24 @@
 using System;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Rest;
-using Microsoft.Threading;
-using ApiHost.Models;
-using System.IO;
-using System.Threading;
-using Microsoft.Rest.Serialization;
-using System.Net.Http.Headers;
-using System.Configuration;
-using System.Net;
 using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using ApiHost.Models;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.PowerBI.Api.V1;
 using Microsoft.PowerBI.Api.V1.Models;
+using Microsoft.Rest;
+using Microsoft.Rest.Serialization;
+using Microsoft.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Linq;
+using ProvisionSample.Models;
 
 namespace ProvisionSample
 {
@@ -329,6 +330,32 @@ namespace ProvisionSample
                         exit = true;
                         break;
                 }
+            }
+            catch (HttpOperationException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error message: {0}", ex.Message);
+                var error = SafeJsonConvert.DeserializeObject<PBIExceptionBody>(ex.Response.Content);
+                if (error != null && error.Error != null)
+                {
+                    if (error.Error.Details != null && error.Error.Details.Any())
+                    {
+                        Console.WriteLine(error.Error.Details.First().Message);
+                    }
+
+                    if (!string.IsNullOrEmpty(error.Error.Code))
+                    {
+                        Console.WriteLine(error.Error.Code);
+                    }
+                }
+
+                IEnumerable<string> requestIds;
+                var result = ex.Response.Headers.TryGetValue("RequestId", out requestIds);
+                if (result && requestIds != null && requestIds.Any())
+                {
+                    Console.WriteLine("RequestId : {0}", requestIds.First());
+                }
+                Console.WriteLine();
             }
             catch (Exception ex)
             {
