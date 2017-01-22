@@ -18,7 +18,7 @@ using Microsoft.Rest.Serialization;
 using Microsoft.Threading;
 using ProvisionSample.Models;
 
-namespace ProvisionSample
+namespace ProvisionSample 
 {
     partial class Program
     {
@@ -265,9 +265,7 @@ namespace ProvisionSample
 
             foreach (var instance in workspaces)
             {
-                // TODO
-                //Console.WriteLine("Collection: {0}, Id: {1}, Display Name: {2}", instance.WorkspaceCollectionName, instance.WorkspaceId, instance.DisplayName);
-                Console.WriteLine("Collection: {0}, Id: {1}, Display Name: {2}", instance.WorkspaceCollectionName, instance.WorkspaceId, instance.WorkspaceId);
+                Console.WriteLine("Collection: {0}, Id: {1}, Display Name: {2}", instance.WorkspaceCollectionName, instance.WorkspaceId, instance.DisplayName);
             }
             if (workspaces.Any())
             {
@@ -610,17 +608,15 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task<Workspace> CreateWorkspace(string workspaceCollectionName, string workspaceName)
         {
-            // TODO
-            ////CreateWorkspaceRequest request = null;
-            ////if (!string.IsNullOrEmpty(workspaceName))
-            ////{
-            ////    request = new CreateWorkspaceRequest(workspaceName);
-            ////}
+            CreateWorkspaceRequest request = null;
+            if (!string.IsNullOrEmpty(workspaceName))
+            {
+                request = new CreateWorkspaceRequest(workspaceName);
+            }
             using (var client = await CreateClient())
             {
                 // Create a new workspace witin the specified collection
-                ////return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName, request);
-                return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName);
+                return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName, request);
             }
         }
 
