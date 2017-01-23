@@ -4,9 +4,47 @@ using System.Threading.Tasks;
 
 namespace ProvisionSample
 {
-    /// <summary>
-    /// Container for async methods, collectng user input and executing PaaS functinality
-    /// </summary>
+    public class Groups
+    {
+        //public Commands commands { get; private set; }
+
+        public Tuple<string, Commands> CurrentGroup { get; private set; }
+
+        public Commands TopLevelCommands { get; private set; }
+
+        private List<Tuple<string, Commands>> m_commandGroups { get; set; }
+
+        public Groups()
+        {
+            m_commandGroups = new List<Tuple<string, Commands>>();
+            TopLevelCommands = new Commands();
+        }
+        public void AddGroup(string name, Commands commands)
+        {
+            commands.RegisterCommand("Exit group", ExitGroup);
+            m_commandGroups.Add(new Tuple<string, Commands>(name, commands));
+            var groupNum = m_commandGroups.Count - 1;
+            TopLevelCommands.RegisterCommand(name, () => SetGroup(groupNum));
+        }
+
+        public Func<Task> GetCommand(bool switchGroup, int index)
+        {
+            if (!switchGroup && CurrentGroup != null)
+                return CurrentGroup.Item2.GetCommand(index);
+
+            return TopLevelCommands.GetCommand(index);
+        }
+
+        private async Task ExitGroup()
+        {
+            CurrentGroup = null;
+        }
+
+        private async Task SetGroup(int group)
+        {
+            CurrentGroup = m_commandGroups[group];
+        }
+    }
     public class Commands
     {
         private readonly List<Tuple<string, Func<Task>>> m_commands = new List<Tuple<string, Func<Task>>>();
@@ -36,32 +74,6 @@ namespace ProvisionSample
 
         public int Count { get { return m_commands.Count; } }
     }
-
-    /// <summary>
-    /// List of avalable administrative commands. Sholud all differ in prefix
-    /// </summary>
-    public enum AdminCommands
-    {
-        /// <summary>
-        /// Exit application
-        /// </summary>
-        ExitTool,
-
-        /// <summary>
-        /// Clear cached parameters
-        /// </summary>
-        ClearSettings,
-
-        /// <summary>
-        /// iterate on all cached parameter to clear/re-assign/leave as is
-        /// </summary>
-        ManageSettings,
-
-        /// <summary>
-        /// Display all cached parameters
-        /// </summary>
-        DisplaySettings,
-    };
 
     /// <summary>
     /// Utilities for getting user insertion. To be overritten for processing scripts
@@ -171,10 +183,9 @@ namespace ProvisionSample
             return param;
         }
 
-        public virtual void GetUserCommandSelection(out AdminCommands? adminCommand, out int? numericCommand)
+        public virtual void GetUserCommandSelection(out bool switchGroup, out int? numericCommand)
         {
             numericCommand = null;
-            adminCommand = null;
             while (true)
             {
                 var command = Console.ReadLine();
@@ -185,22 +196,22 @@ namespace ProvisionSample
                 }
 
                 int val;
+                if(command[0] == '#')
+                {
+                    switchGroup = true;
+                    command = command.TrimStart('#');
+                }
+                else
+                {
+                    switchGroup = false;
+                }
+
                 if (int.TryParse(command, out val))
                 {
                     numericCommand = val;
                     return;
                 }
-                if (command.Length >= 1)
-                {
-                    foreach (AdminCommands ac in Enum.GetValues(typeof(AdminCommands)))
-                    {
-                        if (ac.ToString().StartsWith(command, StringComparison.CurrentCultureIgnoreCase))
-                        {
-                            adminCommand = ac;
-                            return;
-                        }
-                    }
-                }
+                
                 Console.WriteLine("Illegal input. Try again");
             }
         }
@@ -211,26 +222,29 @@ namespace ProvisionSample
     /// </summary>
     public static class ConsoleHelper
     {
-        public static void PrintCommands(Commands commands)
+        public static void PrintCommands(Groups group)
         {
-            var color = ConsoleColor.Green;
             Console.WriteLine();
-            Console.Write("What do you want to do (select ");
-            Console.ForegroundColor = color;
-            Console.Write("prefix/numeric");
-            Console.ResetColor();
-            Console.WriteLine(" value)?");
-            Console.WriteLine("=================================================================");
-            foreach (AdminCommands ac in Enum.GetValues(typeof(AdminCommands)))
+            WriteColoredValue("What do you want to do (select ", "numeric", ConsoleColor.Green, " value)?", showEquals:false, newLine:true);
+            Commands commands;
+            if (group.CurrentGroup != null)
             {
-                WriteColoredStringLine(ac.ToString(), color, 1);
+                WriteColoredValue("Current group", group.CurrentGroup.Item1, ConsoleColor.Magenta, newLine:true);
+                WriteColoredValue("You can use ", "#1, #2 ... ", ConsoleColor.Green, "to quickly switch to another group", showEquals:false, newLine:true);
+                commands = group.CurrentGroup.Item2;
             }
-            Console.WriteLine();
+            else
+            {
+                Console.WriteLine("Select command group:");
+                commands = group.TopLevelCommands;
+            }
+            Console.WriteLine("=================================================================");
+            
             for (int i = 0; i < commands.Count; i++)
             {
                 var numericSize = i < 9 ? 1 : ((i < 99) ? 2 : 3);
                 var align = i < 9 ? " " : "";
-                WriteColoredStringLine(string.Format("{0} {1} {2}", i + 1, align, commands.GetCommandDescription(i)), color, numericSize);
+                WriteColoredStringLine(string.Format("{0} {1} {2}", i + 1, align,commands.GetCommandDescription(i)), ConsoleColor.Green, numericSize);
             }
             Console.WriteLine();
         }
@@ -243,14 +257,24 @@ namespace ProvisionSample
             Console.WriteLine(text.Substring(coloredChars));
         }
 
-        public static void WriteColoredValue(string desc, string param, ConsoleColor color, string restOfLine = null)
+        public static void WriteColoredValue(string desc, string param, ConsoleColor color, string restOfLine = null, bool showEquals = true, bool newLine = false)
         {
-            Console.Write(desc + " = ");
+            Console.Write(desc);
+            if (showEquals)
+            {
+                Console.Write(" = ");
+            }
+
             Console.ForegroundColor = color;
             Console.Write(param);
             Console.ResetColor();
             if (restOfLine != null)
                 Console.Write(restOfLine);
+
+            if(newLine)
+            {
+                Console.WriteLine();
+            }
         }
 
         public static string ReadPassword()
