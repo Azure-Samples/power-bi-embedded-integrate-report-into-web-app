@@ -1,3 +1,11 @@
+using ApiHost.Models;
+using Microsoft.PowerBI.Api.V1;
+using Microsoft.PowerBI.Api.V1.Models;
+using Microsoft.PowerBI.Security;
+using Microsoft.Rest;
+using Microsoft.Rest.Serialization;
+using Microsoft.Threading;
+using ProvisionSample.Models;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -9,16 +17,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using ApiHost.Models;
-using Microsoft.PowerBI.Api.V1;
-using Microsoft.PowerBI.Api.V1.Models;
-using Microsoft.PowerBI.Security;
-using Microsoft.Rest;
-using Microsoft.Rest.Serialization;
-using Microsoft.Threading;
-using ProvisionSample.Models;
 
-namespace ProvisionSample 
+namespace ProvisionSample
 {
     partial class Program
     {
@@ -37,10 +37,9 @@ namespace ProvisionSample
         static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
         static string datasetId = ConfigurationManager.AppSettings["datasetId"];
         static string collectionLocation = defaultRegion;
-
+        static Groups groups = new Groups();
         static WorkspaceCollectionKeys accessKeys = null;
-
-        static Commands commands = new Commands();
+        static string datasourceId = null;
         static UserInput userInput = null;
 
         static void Main(string[] args)
@@ -69,6 +68,7 @@ namespace ProvisionSample
 
         static void SetupCommands()
         {
+            var commands = new Commands();
             commands.RegisterCommand("Get Workspace Collections", ListWorkspaceCollections);
             commands.RegisterCommand("Get metadata for a Workspace Collection", GetWorkspaceCollectionMetadata);
             commands.RegisterCommand("Get API keys for a Workspace Collection", ListWorkspaceCollectionApiKeys);
@@ -76,45 +76,48 @@ namespace ProvisionSample
 
             commands.RegisterCommand("Get Workspaces within a collection", ListWorkspacesInCollection);
             commands.RegisterCommand("Provision a new Workspace", ProvisionNewWorkspace);
+            //commands.RegisterCommand("Delete Workspace by id", DeleteWorkspace);
+            groups.AddGroup("Collection management", commands);
 
+            commands = new Commands();
             commands.RegisterCommand("Get Datasets in a workspace", ListDatasetInWorkspace);
             commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
             commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
             commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
             commands.RegisterCommand("Update a Connection String for a dataset (Cloud only)", UpdateConnetionString);
-
             commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
-            commands.RegisterCommand("Get billing info", GetBillingInfo);
+            groups.AddGroup("Report management", commands);
 
+            commands = new Commands();
+            commands.RegisterCommand("Get billing info", GetBillingInfo);
+            commands.RegisterCommand("Generate Push Json from PBI Desktop Template", GetPushFromTemplate);
+            groups.AddGroup("Misc.", commands);
+
+            commands = new Commands();
+            commands.RegisterCommand("Display Settings", ShowCachedMetadata);
+            commands.RegisterCommand("Manage Settings", () => ManageCachedMetadata(forceReset: false));
+            commands.RegisterCommand("Clear Settings", () => ManageCachedMetadata(forceReset: true));
+            commands.RegisterCommand("Exit", Exit);
+            groups.AddGroup("Settings", commands);
         }
 
         static async Task<bool> Run()
         {
             Console.ResetColor();
-            AdminCommands? adminCommand = null;
             try
             {
-                ConsoleHelper.PrintCommands(commands);
+                ConsoleHelper.PrintCommands(groups);
 
                 int? numericCommand;
-                userInput.GetUserCommandSelection(out adminCommand, out numericCommand);
-                if (adminCommand.HasValue)
-                {
-                    switch (adminCommand.Value)
-                    {
-                        case AdminCommands.ExitTool: return false;
-                        case AdminCommands.ClearSettings: ManageCachedMetadata(forceReset: true); break;
-                        case AdminCommands.ManageSettings: ManageCachedMetadata(forceReset: false); break;
-                        case AdminCommands.DisplaySettings: ShowCachedMetadata(); break;
-                    }
-                }
-                else if (numericCommand.HasValue)
+                bool switchGroup;
+                userInput.GetUserCommandSelection(out switchGroup, out numericCommand);
+                if (numericCommand.HasValue)
                 {
                     int index = numericCommand.Value - 1;
                     Func<Task> operation = null;
                     if (index >= 0)
                     {
-                        operation = commands.GetCommand(index);
+                        operation = groups.GetCommand(switchGroup, index);
                     }
 
                     if (operation != null)
@@ -127,7 +130,7 @@ namespace ProvisionSample
                     }
                 }
                 else
-                    Console.WriteLine("Missing admin or numeric operations");
+                    Console.WriteLine("Missing command");
             }
             catch (HttpOperationException ex)
             {
@@ -161,7 +164,7 @@ namespace ProvisionSample
                 Console.WriteLine("Ooops, something broke: {0}", ex.Message);
                 Console.WriteLine();
             }
-            return (!adminCommand.HasValue || adminCommand.Value != AdminCommands.ExitTool);
+            return true;
         }
 
         [Flags]
@@ -204,6 +207,19 @@ namespace ProvisionSample
                 collectionLocation = userInput.EnsureParam(collectionLocation, "Collection location", forceReEnter: ((forceEntering & EnsureExtras.CollectionLocation) == EnsureExtras.CollectionLocation));
         }
 
+        static async Task ProvisionNewWorkspaceCollection()
+        {
+            // force new workspaceCollectionName, but if collectionLocation, set to the default, as users may be unaware of options
+            workspaceCollectionName = null;
+            collectionLocation = collectionLocation ?? defaultRegion;
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure | EnsureExtras.CollectionLocation);
+
+            await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName, collectionLocation);
+            accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Workspace collection created successfully");
+        }
+
         static async Task ListWorkspaceCollections()
         {
 
@@ -243,19 +259,6 @@ namespace ProvisionSample
             Console.WriteLine("Key2: {0}", accessKeys.Key2);
         }
 
-        static async Task ProvisionNewWorkspaceCollection()
-        {
-            // force new workspaceCollectionName, but if collectionLocation, set to the default, as users may be unaware of options
-            workspaceCollectionName = null;
-            collectionLocation = collectionLocation ?? defaultRegion;
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.Azure | EnsureExtras.CollectionLocation);
-
-            await CreateWorkspaceCollection(subscriptionId, resourceGroup, workspaceCollectionName, collectionLocation);
-            accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("Workspace collection created successfully");
-        }
-
         static async Task ListWorkspacesInCollection()
         {
             EnsureBasicParams(EnsureExtras.WorkspaceCollection);
@@ -284,24 +287,14 @@ namespace ProvisionSample
             Console.WriteLine("Workspace Id: {0}", workspaceId);
         }
 
-        static async Task ListDatasetInWorkspace()
-        {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
-            var datasets = await ListDatasets(workspaceCollectionName, workspaceId);
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            if (datasets.Any())
-            {
-                foreach (Dataset d in datasets)
-                {
-                    Console.WriteLine("{0}:  {1}", d.Name, d.Id);
-                }
-                datasetId = datasets.Last().Id;
-            }
-            else
-            {
-                Console.WriteLine("No Datasets found in this workspace");
-            }
-        }
+        //static async Task DeleteWorkspace()
+        //{
+        //    EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId, forceEntering:EnsureExtras.WorspaceId);
+
+        //    var result = await DeleteWorkspace(workspaceCollectionName, workspaceId);
+        //    Console.ForegroundColor = ConsoleColor.Cyan;
+        //    Console.WriteLine("Result: {0}", result);
+        //}
 
         static async Task ImportPBIX()
         {
@@ -312,46 +305,6 @@ namespace ProvisionSample
             var import = await ImportPbix(workspaceCollectionName, workspaceId, datasetName, filePath);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Import: {0}", import.Id);
-        }
-
-        static async Task GetImportStatus()
-        {
-            workspaceId = null;
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
-            var importId = userInput.EnsureParam(null, "Import Id");
-
-            var importResult = await GetImport(workspaceCollectionName, workspaceId, importId);
-            if (importResult == null)
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("Import state of {0} is not found.", importId);
-            }
-            else
-            {
-                Console.WriteLine("Name:     {0}", importResult.Name);
-                Console.WriteLine("Id:       {0}", importResult.Id);
-                Console.WriteLine("State:    {0}", importResult.ImportState);
-                Console.WriteLine("DataSets: {0}", importResult.Datasets.Count);
-                foreach (var dataset in importResult.Datasets)
-                {
-                    Console.WriteLine("\t{0}: {1}", dataset.Name, dataset.WebUrl);
-                }
-                Console.WriteLine("Reports: {0}", importResult.Reports.Count);
-                foreach (var report in importResult.Reports)
-                {
-                    Console.WriteLine("\t{0}: {1}", report.Name, report.WebUrl);
-                }
-            }
-        }
-
-        static async Task DeleteDataset()
-        {
-            // reset datasetId to force assignment 
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
-            await DeleteDataset(workspaceCollectionName, workspaceId, datasetId);
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("Dataset deleted successfully.");
-            datasetId = null;
         }
 
         static async Task UpdateConnetionString()
@@ -408,7 +361,83 @@ namespace ProvisionSample
             Console.WriteLine("Renders: {0}", billInfo.Renders);
         }
 
-        static void ShowCachedMetadata()
+        static async Task GetPushFromTemplate()
+        {
+            Console.Write("pbit File Path:");
+            var path = Console.ReadLine();
+            Console.Write("Dataset Name:");
+            var datasetName = Console.ReadLine();
+            await JsonConvertor.Convert(datasetName, path);
+        }
+
+        static async Task ListDatasetInWorkspace()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+            var datasets = await ListDatasets(workspaceCollectionName, workspaceId);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            if (datasets.Any())
+            {
+                foreach (Dataset d in datasets)
+                {
+                    Console.WriteLine("{0}:  {1}", d.Name, d.Id);
+                }
+                datasetId = datasets.Last().Id;
+            }
+            else
+            {
+                Console.WriteLine("No Datasets found in this workspace");
+            }
+        }
+
+        static async Task DeleteDataset()
+        {
+            // reset datasetId to force assignment 
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
+            await DeleteDataset(workspaceCollectionName, workspaceId, datasetId);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Dataset deleted successfully.");
+            datasetId = null;
+        }
+
+        static async Task GetImportStatus()
+        {
+            workspaceId = null;
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+            var importId = userInput.EnsureParam(null, "Import Id");
+
+            var importResult = await GetImport(workspaceCollectionName, workspaceId, importId);
+            if (importResult == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Import state of {0} is not found.", importId);
+            }
+            else
+            {
+                Console.WriteLine("Name:     {0}", importResult.Name);
+                Console.WriteLine("Id:       {0}", importResult.Id);
+                Console.WriteLine("State:    {0}", importResult.ImportState);
+                Console.WriteLine("DataSets: {0}", importResult.Datasets.Count);
+                foreach (var dataset in importResult.Datasets)
+                {
+                    Console.WriteLine("\t{0}: {1}", dataset.Name, dataset.WebUrl);
+                }
+                Console.WriteLine("Reports: {0}", importResult.Reports.Count);
+                foreach (var report in importResult.Reports)
+                {
+                    Console.WriteLine("\t{0}: {1}", report.Name, report.WebUrl);
+                }
+            }
+        }
+
+        static async Task<Import> GetImport(string workspaceCollectionName, string workspaceId, string importId)
+        {
+            using (var client = await CreateClient())
+            {
+                return await client.Imports.GetImportByIdAsync(workspaceCollectionName, workspaceId, importId);
+            }
+        }
+
+        static async Task ShowCachedMetadata()
         {
             ConsoleHelper.WriteColoredValue("Workspace Collection Name", workspaceCollectionName, ConsoleColor.Magenta, "\n");
             var usedAccessKey = (accessKeys == null) ? null : accessKeys.Key1;
@@ -421,7 +450,7 @@ namespace ProvisionSample
             Console.WriteLine();
         }
 
-        static void ManageCachedMetadata(bool forceReset)
+        static async Task ManageCachedMetadata(bool forceReset)
         {
             // ManageCachedParam may throw, to quit the management
             try
@@ -457,23 +486,20 @@ namespace ProvisionSample
             }
         }
 
-        static async Task<Import> GetImport(string workspaceCollectionName, string workspaceId, string importId)
+        static async Task Exit()
         {
-            using (var client = await CreateClient())
-            {
-                return await client.Imports.GetImportByIdAsync(workspaceCollectionName, workspaceId, importId);
-            }
+            Environment.Exit(0);
         }
 
-        /// <summary>
-        /// Creates a new Power BI Embedded workspace collection
-        /// </summary>
-        /// <param name="subscriptionId">The azure subscription id</param>
-        /// <param name="resourceGroup">The azure resource group</param>
-        /// <param name="workspaceCollectionName">The Power BI workspace collection name to create</param>
-        ///         /// <param name="region">The Power BI region</param>
-        /// <returns></returns>
-        static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName, string region)
+            /// <summary>
+            /// Creates a new Power BI Embedded workspace collection
+            /// </summary>
+            /// <param name="subscriptionId">The azure subscription id</param>
+            /// <param name="resourceGroup">The azure resource group</param>
+            /// <param name="workspaceCollectionName">The Power BI workspace collection name to create</param>
+            /// <param name="region">The Power BI region</param>
+            /// <returns></returns>
+            static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName, string region)
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
 
@@ -492,7 +518,7 @@ namespace ProvisionSample
                 content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=utf-8");
 
                 var request = new HttpRequestMessage(HttpMethod.Put, url);
-                // Set authorization header from you acquired Azure AD token
+                // Set authorization header from your acquired Azure AD token
                 await SetAuthorizationHeaderIfNeeded(request);
 
                 request.Content = content;
@@ -552,7 +578,7 @@ namespace ProvisionSample
             using (client)
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
-                // Set authorization header from you acquired Azure AD token
+                // Set authorization header from your acquired Azure AD token
                 await SetAuthorizationHeaderIfNeeded(request);
 
                 request.Content = new StringContent(string.Empty);
@@ -585,7 +611,7 @@ namespace ProvisionSample
             using (client)
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                // Set authorization header from you acquired Azure AD token
+                // Set authorization header from your acquired Azure AD token
                 await SetAuthorizationHeaderIfNeeded(request);
 
                 var response = await client.SendAsync(request);
@@ -598,6 +624,33 @@ namespace ProvisionSample
 
                 var json = await response.Content.ReadAsStringAsync();
                 return json;
+            }
+        }
+
+        static async Task<BillingUsage> GetBillingUsage(string subscriptionId, string resourceGroup, string workspaceCollectionName)
+        {
+            var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}/billingUsage{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
+
+            HttpClient client = CreateHttpClient();
+
+            using (client)
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                // Set authorization header from your acquired Azure AD token
+                await SetAuthorizationHeaderIfNeeded(request);
+
+                request.Content = new StringContent(string.Empty);
+                var response = await client.SendAsync(request);
+
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    var responseText = await response.Content.ReadAsStringAsync();
+                    var message = string.Format("Status: {0}, Reason: {1}, Message: {2}", response.StatusCode, response.ReasonPhrase, responseText);
+                    throw new Exception(message);
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                return SafeJsonConvert.DeserializeObject<BillingUsage>(json);
             }
         }
 
@@ -619,6 +672,20 @@ namespace ProvisionSample
                 return await client.Workspaces.PostWorkspaceAsync(workspaceCollectionName, request);
             }
         }
+
+        /// <summary>
+        /// Deletes Power BI Embedded workspace within the specified collection
+        /// </summary>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
+        /// <returns></returns>
+        //static async Task<Workspace> DeleteWorkspace(string workspaceCollectionName, string workspaceid)
+        //{
+        //    using (var client = await CreateClient())
+        //    {
+        //        // Delete a workspace witin the specified collection
+        //        return await client.Workspaces.DeleteWorkspaceAsync(workspaceCollectionName, workspaceid);
+        //    }
+        //}
 
         /// <summary>
         /// Gets a list of Power BI Embedded workspaces within the specified collection
@@ -704,7 +771,7 @@ namespace ProvisionSample
         /// </summary>
         /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
         /// <param name="workspaceId">The Power BI workspace id that contains the dataset</param>
-        /// <param name="id"></param>
+        /// <param name="datasetId">The Power BI dataset to update connection for</param>
         /// <returns></returns>
         static async Task UpdateConnection(string workspaceCollectionName, string workspaceId, string datasetId)
         {
@@ -753,39 +820,33 @@ namespace ProvisionSample
             }
         }
 
+        /// <summary>
+        /// Get the single report out of the list of existing ones
+        /// </summary>
+        /// <param name="workspaceCollectionName"></param>
+        /// <param name="workspaceId"></param>
+        /// <param name="index">which, 0..n for specific, -1 for last if n > number of reports then last</param>
+        /// <returns></returns>
+        static async Task<Report> GetReport(string workspaceCollectionName, string workspaceId, int index = -1)
+        {
+            using (var client = await CreateClient())
+            {
+                var reports = await client.Reports.GetReportsAsync(workspaceCollectionName, workspaceId);
+                if (reports.Value.Any())
+                {
+                    index = ((index < 0) || ((reports.Value.Count - 1) < index)) ? reports.Value.Count - 1 : index;
+                    return reports.Value[index];
+                }
+            }
+            return null;
+        }
+
         static async Task<IList<Report>> GetReports(string workspaceCollectionName, string workspaceId)
         {
             using (var client = await CreateClient())
             {
                 var reports = await client.Reports.GetReportsAsync(workspaceCollectionName, workspaceId);
                 return reports.Value;
-            }
-        }
-
-        static async Task<BillingUsage> GetBillingUsage(string subscriptionId, string resourceGroup, string workspaceCollectionName)
-        {
-            var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}/billingUsage{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
-
-            HttpClient client = CreateHttpClient();
-
-            using (client)
-            {
-                var request = new HttpRequestMessage(HttpMethod.Post, url);
-                // Set authorization header from your acquired Azure AD token
-                await SetAuthorizationHeaderIfNeeded(request);
-
-                request.Content = new StringContent(string.Empty);
-                var response = await client.SendAsync(request);
-
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    var responseText = await response.Content.ReadAsStringAsync();
-                    var message = string.Format("Status: {0}, Reason: {1}, Message: {2}", response.StatusCode, response.ReasonPhrase, responseText);
-                    throw new Exception(message);
-                }
-
-                var json = await response.Content.ReadAsStringAsync();
-                return SafeJsonConvert.DeserializeObject<BillingUsage>(json);
             }
         }
     }

@@ -64,6 +64,8 @@
       <HintPath>..\packages\System.IdentityModel.Tokens.Jwt.4.0.2.206221351\lib\net45\System.IdentityModel.Tokens.Jwt.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Net" />
     <Reference Include="System.Net.Http.WebRequest" />
     <Reference Include="System.Xml.Linq" />
@@ -76,6 +78,8 @@
   <ItemGroup>
     <Compile Include="AsyncPump.cs" />
     <Compile Include="ConsoleHelper.cs" />
+    <Compile Include="Dataset.cs" />
+    <Compile Include="JsonConvertor.cs" />
     <Compile Include="Models\BillingUsage.cs" />
     <Compile Include="Models\PBIExceptionBody.cs" />
     <Compile Include="Models\WorkspaceCollection.cs" />
