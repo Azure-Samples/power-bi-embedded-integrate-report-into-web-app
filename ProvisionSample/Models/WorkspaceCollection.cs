@@ -9,10 +9,12 @@ namespace ApiHost.Models
 {
     public class WorkspaceCollection
     {
-        [JsonProperty(PropertyName = "objectId")]
-        Guid Id { get; set; }
-
         [JsonProperty(PropertyName = "name")]
-        string Name { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class WorkspaceCollectionList
+    {
+        public List<WorkspaceCollection> value;
     }
 }
