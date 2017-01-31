@@ -108,7 +108,7 @@ namespace ProvisionSample
                 }
                 param = val;
             }
-            return null;
+            return param;
         }
 
         public virtual string EnsureParam(string param, string desc, bool onlyFillIfEmpty = false, bool forceReEnter = false, bool isPassword = false)
