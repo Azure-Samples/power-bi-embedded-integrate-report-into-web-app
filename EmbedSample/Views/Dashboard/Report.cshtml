@@ -56,8 +56,16 @@
             <button id="filter-add" type="button" class="btn btn-success">Add Filter</button>
         </form>
     </div>
+
+    @{ 
+        var liveSampleUrl = "https://microsoft.github.io/PowerBI-JavaScript/demo/code-demo/index.html?";
+        liveSampleUrl += "?embedUrl=" + Url.Encode(Model.Report.EmbedUrl);
+        liveSampleUrl += "?embedId=" + Url.Encode(Model.Report.Id);
+        liveSampleUrl += "&accessToken=" + Url.Encode(Model.AccessToken);
+    }
+
     <div class="col-md-3 livesamplelink">
-        For more features please check our <a href="https://microsoft.github.io/PowerBI-JavaScript/demo">Live Sample</a>
+        Embed and play with current report using <a href="@liveSampleUrl">Embedded Live Sample</a>
     </div>
 </div>
 
