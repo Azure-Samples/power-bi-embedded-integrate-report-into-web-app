@@ -35,11 +35,13 @@ namespace ProvisionSample
         static string password = ConfigurationManager.AppSettings["password"];
         static string accessKey = ConfigurationManager.AppSettings["accessKey"];
         static string workspaceId = ConfigurationManager.AppSettings["workspaceId"];
-        static string datasetId = ConfigurationManager.AppSettings["datasetId"];
+
+        static string datasetId = null;
+        static string reportId = null;
+
         static string collectionLocation = defaultRegion;
         static Groups groups = new Groups();
         static WorkspaceCollectionKeys accessKeys = null;
-        static string datasourceId = null;
         static UserInput userInput = null;
 
         static void Main(string[] args)
@@ -80,12 +82,15 @@ namespace ProvisionSample
             groups.AddGroup("Collection management", commands);
 
             commands = new Commands();
-            commands.RegisterCommand("Get Datasets in a workspace", ListDatasetInWorkspace);
+            commands.RegisterCommand("Get Datasets in a workspace", ListDatasetsInWorkspace);
+            commands.RegisterCommand("Get Reports in a workspace", ListReportsInWorkspace);
             commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
             commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
             commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
             commands.RegisterCommand("Update a Connection String for a dataset (Cloud only)", UpdateConnetionString);
             commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
+            commands.RegisterCommand("Clone report", CloneReport);
+            commands.RegisterCommand("Rebind report to another dataset", RebindReport);
             groups.AddGroup("Report management", commands);
 
             commands = new Commands();
@@ -222,7 +227,6 @@ namespace ProvisionSample
 
         static async Task ListWorkspaceCollections()
         {
-
             EnsureBasicParams(EnsureExtras.Azure);
 
             var workspaceCollections = await GetWorkspaceCollectionsList(subscriptionId, resourceGroup);
@@ -370,23 +374,51 @@ namespace ProvisionSample
             await JsonConvertor.Convert(datasetName, path);
         }
 
-        static async Task ListDatasetInWorkspace()
+        static async Task ListDatasetsInWorkspace()
         {
             EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+
             var datasets = await ListDatasets(workspaceCollectionName, workspaceId);
+
             Console.ForegroundColor = ConsoleColor.Cyan;
-            if (datasets.Any())
-            {
-                foreach (Dataset d in datasets)
-                {
-                    Console.WriteLine("{0}:  {1}", d.Name, d.Id);
-                }
-                datasetId = datasets.Last().Id;
-            }
-            else
+            if (!datasets.Any())
             {
                 Console.WriteLine("No Datasets found in this workspace");
+                return;
             }
+
+            foreach (Dataset dataset in datasets)
+            {
+                Console.WriteLine("Id       | {0}", dataset.Id);
+                Console.WriteLine("Name     | {0}", dataset.Name);
+                Console.WriteLine();
+            }
+
+            datasetId = datasets.Last().Id;
+        }
+
+        static async Task ListReportsInWorkspace()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+
+            var reports = await ListReports(workspaceCollectionName, workspaceId);
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            if (!reports.Any())
+            {
+                Console.WriteLine("No Reports found in this workspace");
+                return;
+            }
+
+            foreach (var report in reports)
+            {
+                Console.WriteLine("Id       | {0}", report.Id);
+                Console.WriteLine("Name     | {0}", report.Name);
+                Console.WriteLine("EmbedUrl | {0}", report.EmbedUrl);
+                Console.WriteLine();
+            }
+
+            reportId = reports.Last().Id;
         }
 
         static async Task DeleteDataset()
@@ -397,6 +429,49 @@ namespace ProvisionSample
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Dataset deleted successfully.");
             datasetId = null;
+        }
+
+        private static async Task RebindReport()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+            reportId = userInput.EnsureParam(reportId, "Report Id");
+            datasetId = userInput.EnsureParam(datasetId, "Dataset Id to rebind to");
+
+            var rebindReportRequest = new RebindReportRequest(datasetId);
+
+            using (var client = await CreateClient())
+            {
+                await client.Reports.RebindReportAsync(
+                        workspaceCollectionName,
+                        workspaceId,
+                        reportId,
+                        rebindReportRequest);
+            }
+        }
+
+        private static async Task CloneReport()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+            reportId = userInput.EnsureParam(reportId, "Report Id");
+            var newName = userInput.EnsureParam(null, "New Report Name");
+            var targetWorkspace = userInput.EnterOptionalParam("Target Workspace Id", "clone to same workspace.");
+            var targetDataset = userInput.EnterOptionalParam("Target Dataset Id", "keep the original dataset");
+
+            var cloneReportRequest = new CloneReportRequest(newName, targetWorkspace, targetDataset);
+
+            using (var client = await CreateClient())
+            {
+                await client.Reports.CloneReportAsync(
+                        workspaceCollectionName,
+                        workspaceId,
+                        reportId,
+                        cloneReportRequest);
+            }
+
+            if (!string.IsNullOrEmpty(targetWorkspace))
+            {
+                workspaceId = targetWorkspace;
+            }
         }
 
         static async Task GetImportStatus()
@@ -437,69 +512,78 @@ namespace ProvisionSample
             }
         }
 
-        static async Task ShowCachedMetadata()
+        static Task ShowCachedMetadata()
         {
-            ConsoleHelper.WriteColoredValue("Workspace Collection Name", workspaceCollectionName, ConsoleColor.Magenta, "\n");
-            var usedAccessKey = (accessKeys == null) ? null : accessKeys.Key1;
-            ConsoleHelper.WriteColoredValue("Workspace Collection Access Key1", usedAccessKey, ConsoleColor.Magenta, "\n");
+            return Task.Run(() =>
+            {
+                ConsoleHelper.WriteColoredValue("Workspace Collection Name", workspaceCollectionName, ConsoleColor.Magenta, "\n");
+                var usedAccessKey = (accessKeys == null) ? null : accessKeys.Key1;
+                ConsoleHelper.WriteColoredValue("Workspace Collection Access Key1", usedAccessKey, ConsoleColor.Magenta, "\n");
 
-            ConsoleHelper.WriteColoredValue("Workspace Id", workspaceId, ConsoleColor.Magenta, "\n");
-            ConsoleHelper.WriteColoredValue("DatasetId", datasetId, ConsoleColor.Magenta, "\n");
-            ConsoleHelper.WriteColoredValue("CollectionLocation", collectionLocation, ConsoleColor.Magenta, "\n");
+                ConsoleHelper.WriteColoredValue("Workspace Id", workspaceId, ConsoleColor.Magenta, "\n");
+                ConsoleHelper.WriteColoredValue("DatasetId", datasetId, ConsoleColor.Magenta, "\n");
+                ConsoleHelper.WriteColoredValue("CollectionLocation", collectionLocation, ConsoleColor.Magenta, "\n");
 
-            Console.WriteLine();
+                Console.WriteLine();
+            });
         }
 
-        static async Task ManageCachedMetadata(bool forceReset)
+        static Task ManageCachedMetadata(bool forceReset)
         {
-            // ManageCachedParam may throw, to quit the management
-            try
+            return Task.Run(() =>
             {
-                workspaceCollectionName = userInput.ManageCachedParam(workspaceCollectionName, "Workspace Collection Name", forceReset);
+                // ManageCachedParam may throw, to quit the management
+                try
+                {
+                    workspaceCollectionName = userInput.ManageCachedParam(workspaceCollectionName, "Workspace Collection Name", forceReset);
 
-                string accessKeysKey1 = accessKeys != null ? accessKeys.Key1 : null;
-                accessKeysKey1 = userInput.ManageCachedParam(accessKeysKey1, "Workspace Collection Access Key1", forceReset);
-                if (accessKeysKey1 == null)
-                {
-                    accessKeys = null;
-                }
-                else
-                {
-                    accessKeys = new WorkspaceCollectionKeys
+                    string accessKeysKey1 = accessKeys != null ? accessKeys.Key1 : null;
+                    accessKeysKey1 = userInput.ManageCachedParam(accessKeysKey1, "Workspace Collection Access Key1", forceReset);
+                    if (accessKeysKey1 == null)
                     {
-                        Key1 = accessKeysKey1
-                    };
+                        accessKeys = null;
+                    }
+                    else
+                    {
+                        accessKeys = new WorkspaceCollectionKeys
+                        {
+                            Key1 = accessKeysKey1
+                        };
+                    }
+
+                    workspaceId = userInput.ManageCachedParam(workspaceId, "Workspace Id", forceReset);
+                    datasetId = userInput.ManageCachedParam(datasetId, "Dataset Id", forceReset);
+                    collectionLocation = userInput.ManageCachedParam(collectionLocation, "Collection Location", forceReset);
+
+                    if (forceReset)
+                    {
+                        Console.WriteLine("Entire cache was reset\n");
+                    }
                 }
-
-                workspaceId = userInput.ManageCachedParam(workspaceId, "Workspace Id", forceReset);
-                datasetId = userInput.ManageCachedParam(datasetId, "Dataset Id", forceReset);
-                collectionLocation = userInput.ManageCachedParam(collectionLocation, "Collection Location", forceReset);
-
-                if (forceReset)
+                catch (Exception e)
                 {
-                    Console.WriteLine("Entire cache was reset\n");
+                    Console.WriteLine("\n" + e.Message);
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("\n" + e.Message);
-            }
+            });
         }
 
-        static async Task Exit()
+        static Task Exit()
         {
-            Environment.Exit(0);
+            return Task.Run(() =>
+            {
+                Environment.Exit(0);
+            });
         }
 
-            /// <summary>
-            /// Creates a new Power BI Embedded workspace collection
-            /// </summary>
-            /// <param name="subscriptionId">The azure subscription id</param>
-            /// <param name="resourceGroup">The azure resource group</param>
-            /// <param name="workspaceCollectionName">The Power BI workspace collection name to create</param>
-            /// <param name="region">The Power BI region</param>
-            /// <returns></returns>
-            static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName, string region)
+        /// <summary>
+        /// Creates a new Power BI Embedded workspace collection
+        /// </summary>
+        /// <param name="subscriptionId">The azure subscription id</param>
+        /// <param name="resourceGroup">The azure resource group</param>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name to create</param>
+        /// <param name="region">The Power BI region</param>
+        /// <returns></returns>
+        static async Task CreateWorkspaceCollection(string subscriptionId, string resourceGroup, string workspaceCollectionName, string region)
         {
             var url = string.Format("{0}/subscriptions/{1}/resourceGroups/{2}/providers/Microsoft.PowerBI/workspaceCollections/{3}{4}", azureEndpointUri, subscriptionId, resourceGroup, workspaceCollectionName, version);
 
@@ -736,7 +820,7 @@ namespace ProvisionSample
         }
 
         /// <summary>
-        /// Lists the datasets that are published to a given workspace.
+        /// Lists the datasets that are published in a given workspace.
         /// </summary>
         /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
         /// <param name="workspaceId">The target Power BI workspace id</param>
@@ -745,7 +829,22 @@ namespace ProvisionSample
         {
             using (var client = await CreateClient())
             {
-                ODataResponseListDataset response = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
+                var response = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
+                return response.Value;
+            }
+        }
+
+        /// <summary>
+        /// Lists the reports that are published in a given workspace.
+        /// </summary>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
+        /// <param name="workspaceId">The target Power BI workspace id</param>
+        /// <returns></returns>
+        static async Task<IList<Report>> ListReports(string workspaceCollectionName, string workspaceId)
+        {
+            using (var client = await CreateClient())
+            {
+                var response = await client.Reports.GetReportsAsync(workspaceCollectionName, workspaceId);
                 return response.Value;
             }
         }
