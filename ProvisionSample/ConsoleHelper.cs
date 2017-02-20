@@ -35,14 +35,21 @@ namespace ProvisionSample
             return TopLevelCommands.GetCommand(index);
         }
 
-        private async Task ExitGroup()
+        private Task ExitGroup()
         {
-            CurrentGroup = null;
+            return Task.Run(() => {
+                CurrentGroup = null;
+            });
         }
 
-        private async Task SetGroup(int group)
+        private Task SetGroup(int group)
         {
-            CurrentGroup = m_commandGroups[group];
+            return Task.Run(() => {
+                if (m_commandGroups.Count > group)
+                {
+                    CurrentGroup = m_commandGroups[group];
+                }
+            });
         }
     }
     public class Commands
