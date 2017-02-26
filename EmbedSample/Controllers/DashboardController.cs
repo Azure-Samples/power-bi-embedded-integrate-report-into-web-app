@@ -16,6 +16,7 @@ namespace paas_demo.Controllers
         private readonly string workspaceId;
         private readonly string accessKey;
         private readonly string apiUrl;
+        private readonly string AadToken;
 
         public DashboardController()
         {
@@ -23,6 +24,7 @@ namespace paas_demo.Controllers
             this.workspaceId = ConfigurationManager.AppSettings["powerbi:WorkspaceId"];
             this.accessKey = ConfigurationManager.AppSettings["powerbi:AccessKey"];
             this.apiUrl = ConfigurationManager.AppSettings["powerbi:ApiUrl"];
+            this.AadToken = ConfigurationManager.AppSettings["powerbi:AadToken"];
         }
 
         public ActionResult Index()
@@ -54,7 +56,14 @@ namespace paas_demo.Controllers
                 var report = reportsResponse.Value.FirstOrDefault(r => r.Id == reportId);
                 var embedToken = PowerBIToken.CreateReportEmbedToken(this.workspaceCollection, this.workspaceId, report.Id);
 
-                var viewModel = new ReportViewModel
+                if (!string.IsNullOrEmpty(this.AadToken))
+                {
+                    var aadTokenClaim = new System.Security.Claims.Claim("aadtoken", this.AadToken);
+
+                    embedToken.Claims.Add(aadTokenClaim);
+                }
+
+            var viewModel = new ReportViewModel
                 {
                     Report = report,
                     AccessToken = embedToken.Generate(this.accessKey)
