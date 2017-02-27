@@ -1,33 +1,46 @@
-﻿using ApiHost.Models;
-using Microsoft.IdentityModel.Clients.ActiveDirectory;
-using Microsoft.PowerBI.Api.V1;
-using Microsoft.Rest;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System;
+using System.Configuration;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
-
+using ApiHost.Models;
+using Microsoft.PowerBI.Api.V1;
+using Microsoft.Rest;
 
 namespace ProvisionSample
 {
+    /// <summary>
+    /// This part of Program class includes all Onebox-specific code
+    /// </summary>
     partial class Program
     {
-        static string clientId = "ea0616ba-638b-4df5-95b9-636659ae5121";
-        static Uri redirectUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
-        static string azureToken = null;
+        static string thumbprint = ConfigurationManager.AppSettings["thumbprint"];
+        static bool useCertificate = bool.Parse(ConfigurationManager.AppSettings["useCertificate"]);
 
         private static HttpClient CreateHttpClient()
         {
+            if (useCertificate)
+            {
+                var handler = new WebRequestHandler();
+                var certificate = GetCertificate(thumbprint);
+                handler.ClientCertificates.Add(certificate);
+                return new HttpClient(handler);
+            }
             return new HttpClient();
         }
+
+        // this is async Task to be comparible with the "production" version program. forget about the "This async method lacks 'await'" warning
+#pragma warning disable 1998
         private static async Task SetAuthorizationHeaderIfNeeded(HttpRequestMessage request)
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAzureAccessTokenAsync());
+            if (!useCertificate)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", GetAzureAccessToken());
+            }
         }
+#pragma warning restore 1998
 
         /// <summary>
         /// Creates a new instance of the PowerBIClient with the specified token
@@ -35,27 +48,14 @@ namespace ProvisionSample
         /// <returns></returns>
         static async Task<PowerBIClient> CreateClient()
         {
-            if (accessKeys == null)
-            {
-                var enteredKey = userInput.EnterOptionalParam("Access Key", "Auto select");
-                if (!string.IsNullOrWhiteSpace(enteredKey))
-                {
-                    accessKey = enteredKey;
-                    accessKeys = new WorkspaceCollectionKeys()
-                    {
-                        Key1 = accessKey
-                    };
-                }
-            }
+            await EnsureSigningKeys();
+            return CreateClient("AppKey", accessKeys.Key1);
+        }
 
-            if (accessKeys == null)
-            {
-                // get the current collection's keys
-                accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
-            }
-
-            // Create a token credentials with "AppKey" type
-            var credentials = new TokenCredentials(accessKeys.Key1, "AppKey");
+        static PowerBIClient CreateClient(string bearerType, string token)
+        {
+            // Create a token credentials with "AppToken" type
+            var credentials = new TokenCredentials(token, bearerType);
 
             // Instantiate your Power BI client passing in the required credentials
             var client = new PowerBIClient(credentials);
@@ -66,65 +66,51 @@ namespace ProvisionSample
             return client;
         }
 
-        static async Task<IEnumerable<string>> GetTenantIdsAsync(string commonToken)
+        static async Task EnsureSigningKeys()
         {
-            using (var httpClient = CreateHttpClient())
+            if (accessKeys == null)
             {
-                httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + commonToken);
-                var response = await httpClient.GetStringAsync("https://management.azure.com/tenants?api-version=2016-01-29");
-                var tenantsJson = JsonConvert.DeserializeObject<JObject>(response);
-                var tenants = tenantsJson["value"] as JArray;
+                Console.Write("Access Key: ");
+                accessKey = Console.ReadLine();
+                Console.WriteLine();
 
-                return tenants.Select(t => t["tenantId"].Value<string>());
+                accessKeys = new WorkspaceCollectionKeys()
+                {
+                    Key1 = accessKey
+                };
+            }
+
+            if (accessKeys == null)
+            {
+                accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             }
         }
 
-        /// <summary>
-        /// Gets an Azure access token that can be used to call into the Azure ARM apis.
-        /// </summary>
-        /// <returns>A user token to access Azure ARM</returns>
-        static async Task<string> GetAzureAccessTokenAsync()
+        static string GetAzureAccessToken()
         {
-            if (!string.IsNullOrWhiteSpace(azureToken))
-            {
-                return azureToken;
-            }
-
-            var commonToken = GetCommonAzureAccessToken();
-            var tenantId = (await GetTenantIdsAsync(commonToken.AccessToken)).FirstOrDefault();
-
-            if (string.IsNullOrWhiteSpace(tenantId))
-            {
-                throw new InvalidOperationException("Unable to get tenant id for user accout");
-            }
-
-            var authority = string.Format("https://login.windows.net/{0}/oauth2/authorize", tenantId);
-            var authContext = new AuthenticationContext(authority);
-            var result = await authContext.AcquireTokenByRefreshTokenAsync(commonToken.RefreshToken, clientId, armResource);
-
-            return (azureToken = result.AccessToken);
-
+            return "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6IjF6bmJlNmV2ZWJPamg2TTNXR1E5X1ZmWXVJdyIsImtpZCI6IjF6bmJlNmV2ZWJPamg2TTNXR1E5X1ZmWXVJdyJ9.eyJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuY29yZS53aW5kb3dzLm5ldC8iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLXBwZS5uZXQvODNhYmU1Y2QtYmNjMy00NDFhLWJkODYtZTZhNzUzNjBjZWNjLyIsImlhdCI6MTQ1ODU3Mzk0MywibmJmIjoxNDU4NTczOTQzLCJleHAiOjE0NTg1Nzc4NDMsImFjciI6IjEiLCJhbHRzZWNpZCI6IjE6bGl2ZS5jb206MDAwM0JGRkRDM0Y4OEEyQiIsImFtciI6WyJwd2QiXSwiYXBwaWQiOiJjNDRiNDA4My0zYmIwLTQ5YzEtYjQ3ZC05NzRlNTNjYmRmM2MiLCJhcHBpZGFjciI6IjIiLCJlbWFpbCI6ImF1eHRtMTkyQGxpdmUuY29tIiwiaWRwIjoibGl2ZS5jb20iLCJpcGFkZHIiOiI0MC4xMjIuMjAyLjgxIiwibmFtZSI6ImF1eHRtMTkyQGxpdmUuY29tIiwib2lkIjoiMmMwNzAxOGMtZjVhZC00MDY1LThiYTAtYzA3MmE1NGNkNDNkIiwicHVpZCI6IjEwMDMwMDAwOEIwNDlBQzEiLCJzY3AiOiJ1c2VyX2ltcGVyc29uYXRpb24iLCJzdWIiOiJYOGF3eW9GRnowZWpDTjM4Sm5uRVl6Vy01ODhTNE02NVlldGlGelF5SDJrIiwidGlkIjoiODNhYmU1Y2QtYmNjMy00NDFhLWJkODYtZTZhNzUzNjBjZWNjIiwidW5pcXVlX25hbWUiOiJsaXZlLmNvbSNhdXh0bTE5MkBsaXZlLmNvbSIsInZlciI6IjEuMCJ9.aZmB2woGCRMfHfPcVcC-EmzoGToQfDSdDmbI6wAucHWRE5P9LAflZcBq-LCeUlXA8xzda_6rWo5IcS8nFK8thMofffOCSiyZdrJOZsBKpYhv-XCiWR6y9I-994AyL-Em-f6-Lxf74_pjqd8peT0mmZ_cJyqsY_n20MYmRCf1gKsqzcwObh-RJwP1HG1TXgCRF9zlHl_96nasZdjUShGDG9RYGFUW_qHxh01xn0DWWTr-mCgEvu6PKRXGhDgm2XPcEwhGc6aKnj7buDc7HU5j6nxPQtsaU-fz5RuAQ2ezwy9VUCfAz17HQEz12TQ42Ehhvo2bDtCVkvHwA2egBn9hZA";
         }
 
-        /// <summary>
-        /// Gets a user common access token to access ARM apis
-        /// </summary>
-        /// <returns></returns>
-        static AuthenticationResult GetCommonAzureAccessToken()
+        static X509Certificate2 GetCertificate(string thumbprint)
         {
-            var authContext = new AuthenticationContext("https://login.windows.net/common/oauth2/authorize");
-            var result = authContext.AcquireToken(
-                resource: armResource,
-                clientId: clientId,
-                redirectUri: redirectUri,
-                promptBehavior: PromptBehavior.Auto);
+            X509Certificate2 cert = null;
 
-            if (result == null)
+            var certStore = new X509Store(StoreLocation.LocalMachine);
+            certStore.Open(OpenFlags.ReadOnly);
+
+            var certificates = certStore.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+            if (certificates.Count > 0)
             {
-                throw new InvalidOperationException("Failed to obtain the JWT token");
+                cert = certificates[0];
+            }
+            else
+            {
+                throw new CryptographicException("Cannot find the certificate with the thumbprint: {0}", thumbprint);
             }
 
-            return result;
+            certStore.Close();
+
+            return cert;
         }
     }
 }

@@ -35,6 +35,16 @@ namespace ProvisionSample
             return TopLevelCommands.GetCommand(index);
         }
 
+        public Commands ToFlatCommands()
+        {
+            var commands = new Commands();
+            foreach (var commandGroup in m_commandGroups)
+            {
+                commands.Append(commandGroup.Item2, includeLast: false);
+            }
+            return commands;
+        }
+
         private Task ExitGroup()
         {
             return Task.Run(() => {
@@ -52,6 +62,7 @@ namespace ProvisionSample
             });
         }
     }
+
     public class Commands
     {
         private readonly List<Tuple<string, Func<Task>>> m_commands = new List<Tuple<string, Func<Task>>>();
@@ -59,6 +70,16 @@ namespace ProvisionSample
         public void RegisterCommand(string description, Func<Task> operation)
         {
             m_commands.Add(Tuple.Create(description, operation));
+        }
+
+        public void Append(Commands other, bool includeLast)
+        {
+            m_commands.AddRange(other.m_commands);
+            if (!includeLast)
+            {
+                m_commands.RemoveAt(m_commands.Count - 1);
+            }
+
         }
 
         public Func<Task> GetCommand(int commandNumber)
@@ -246,14 +267,14 @@ namespace ProvisionSample
                 commands = group.TopLevelCommands;
             }
             Console.WriteLine("=================================================================");
-            
-            for (int i = 0; i < commands.Count; i++)
-            {
-                var numericSize = i < 9 ? 1 : ((i < 99) ? 2 : 3);
-                var align = i < 9 ? " " : "";
-                WriteColoredStringLine(string.Format("{0} {1} {2}", i + 1, align,commands.GetCommandDescription(i)), ConsoleColor.Green, numericSize);
-            }
+            PrintCommandsImpl(commands);
+        }
+
+        public static void PrintCommands(Commands commands)
+        {
             Console.WriteLine();
+            WriteColoredValue("What do you want to do (select ", "numeric", ConsoleColor.Green, " value)?", showEquals: false, newLine: true);
+            PrintCommandsImpl(commands);
         }
 
         public static void WriteColoredStringLine(string text, ConsoleColor color, int coloredChars)
@@ -311,6 +332,41 @@ namespace ProvisionSample
 
             Console.WriteLine();
             return password;
+        }
+
+        private static void PrintCommandsImpl(Commands commands)
+        {
+            for (int i = 0; i < commands.Count; i++)
+            {
+                var numericSize = i < 9 ? 1 : ((i < 99) ? 2 : 3);
+                var align = i < 9 ? " " : "";
+                WriteColoredStringLine(string.Format("{0} {1} {2}", i + 1, align, commands.GetCommandDescription(i)), ConsoleColor.Green, numericSize);
+            }
+            Console.WriteLine();
+        }
+    }
+
+    public enum ExecutionLevel
+    {
+        OK,
+        Warning,
+        Error
+    };
+
+    public class ExecutionReport
+    {
+        public ExecutionLevel m_level;
+        public string m_message;
+
+        public ExecutionReport(ExecutionLevel level, string message)
+        {
+            m_level = level;
+            m_message = message;
+        }
+
+        public override string ToString()
+        {
+            return (m_level == ExecutionLevel.OK) ? m_message : string.Format("{0}: {1}", m_level.ToString(), m_message);
         }
     }
 }

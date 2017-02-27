@@ -16,6 +16,9 @@ namespace ProvisionSample.Models
 
         [JsonProperty(PropertyName = "details")]
         public IEnumerable<ExceptionDetails> Details { get; set; }
+
+        [JsonProperty(PropertyName = "message")]
+        public string Message { get; set; }
     }
 
     public class ExceptionDetails
