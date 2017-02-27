@@ -28,6 +28,7 @@ namespace ProvisionSample
 
         static string apiEndpointUri = ConfigurationManager.AppSettings["powerBiApiEndpoint"];
         static string azureEndpointUri = ConfigurationManager.AppSettings["azureApiEndpoint"];
+        static string defaultEmbedUrl = ConfigurationManager.AppSettings["defaultEmbedUrl"];
         static string subscriptionId = ConfigurationManager.AppSettings["subscriptionId"];
         static string resourceGroup = ConfigurationManager.AppSettings["resourceGroup"];
         static string workspaceCollectionName = ConfigurationManager.AppSettings["workspaceCollectionName"];
@@ -44,6 +45,16 @@ namespace ProvisionSample
         static WorkspaceCollectionKeys accessKeys = null;
         static UserInput userInput = null;
 
+        enum EmbedMode: int
+        {
+            // Start from 1 to match user input.
+            View = 1,
+            EditAndSave = 2,
+            EditAndSaveAs = 3,
+            CreateMode = 4,
+        }
+
+        [STAThread]
         static void Main(string[] args)
         {
             if (!string.IsNullOrWhiteSpace(accessKey))
@@ -88,9 +99,10 @@ namespace ProvisionSample
             commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
             commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
             commands.RegisterCommand("Update a Connection String for a dataset (Cloud only)", UpdateConnetionString);
-            commands.RegisterCommand("Get embed url and token for existing report", GetEmbedInfo);
+            commands.RegisterCommand("Generate embed details", GetEmbedInfo);
             commands.RegisterCommand("Clone report", CloneReport);
             commands.RegisterCommand("Rebind report to another dataset", RebindReport);
+            commands.RegisterCommand("Delete report", DeleteReport);
             groups.AddGroup("Report management", commands);
 
             commands = new Commands();
@@ -314,7 +326,7 @@ namespace ProvisionSample
         static async Task UpdateConnetionString()
         {
             EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
-
+			
             await UpdateConnection(workspaceCollectionName, workspaceId, datasetId);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Connection information updated successfully.");
@@ -323,37 +335,178 @@ namespace ProvisionSample
         static async Task GetEmbedInfo()
         {
             EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
-            int? index = -1;
+            int? index = 1;
 
-            IList<Report> reports = await GetReports(workspaceCollectionName, workspaceId);
+            Console.WriteLine("Select Embed Mode:");
+            Console.WriteLine("1) View Mode:            Report.Read");
+            Console.WriteLine("2) Edit & Save Mode:     Report.ReadWrite");
+            Console.WriteLine("3) Edit & Save As Mode:  Report.Read Workspace.Report.Create");
+            Console.WriteLine("4) Create Report Mode:   Dataset.Read Workspace.Report.Create");
+
+            int? mode = userInput.EnsureIntParam((int)EmbedMode.View, "Embed mode");
+            if (!mode.HasValue || mode.Value <= 0 || mode.Value > 4)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("selected mode is out of range.");
+                return;
+            }
+
+            var embedMode = (EmbedMode)mode.Value;
+            string reportId = null;
+            string datasetId = null;
+            string embedUrl = null;
+
+            if (embedMode == EmbedMode.View || embedMode == EmbedMode.EditAndSaveAs || embedMode == EmbedMode.EditAndSave)
+            {
+                // For these modes user need to select a report to embed
+                var reports = await GetReports(workspaceCollectionName, workspaceId);
+                if (!PrintReports(reports))
+                {
+                    return;
+                }
+
+                index = userInput.EnsureIntParam(index, "Index of report to use");
+                if (!index.HasValue || index.Value <= 0 || index.Value > reports.Count)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Report index is out of range.");
+                    return;
+                }
+
+                var report = reports[index.Value - 1];
+                reportId = report.Id;
+                embedUrl = report.EmbedUrl;
+            }
+            else
+            {
+                // For these modes user need to select a dataset to create a report with
+                var datasets = await GetDatasets(workspaceCollectionName, workspaceId);
+                PrintDatasets(datasets);
+
+                index = userInput.EnsureIntParam(index, "Index of dataset to create a report with");
+                if (!index.HasValue || index.Value <= 0 || index.Value > datasets.Count)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Dataset index is out of range.");
+                    return;
+                }
+
+                var dataset = datasets[index.Value - 1];
+                datasetId = dataset.Id;
+                embedUrl = defaultEmbedUrl;
+            }
+
+            var scopes = string.Empty;
+            switch (embedMode)
+            {
+                case EmbedMode.View:
+                    scopes = "Report.Read";
+                    break;
+
+                case EmbedMode.EditAndSave:
+                    scopes = "Report.ReadWrite";
+                    break;
+
+                case EmbedMode.EditAndSaveAs:
+                    scopes = "Report.Read Workspace.Report.Create";
+                    break;
+
+                case EmbedMode.CreateMode:
+                    scopes = "Dataset.Read Workspace.Report.Create";
+                    break;
+
+                default:
+                    scopes = string.Empty;
+                    break;
+            }
+
+            // RLS
+            var rlsUsername = userInput.EnsureParam(null, "RLS - limit to specific user: (Keep empty to create without RLS)");
+            var rlsRoles = userInput.EnsureParam(null, "RLS - limit to specific roles: (comma separated)");
+            var roles = string.IsNullOrEmpty(rlsRoles) ? null : rlsRoles.Split(',');
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Embed Url: {0}", embedUrl);
+
+            PowerBIToken embedToken = null;
+            if (!string.IsNullOrEmpty(reportId))
+            {
+                embedToken = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, reportId, rlsUsername, roles, scopes);
+            }
+            else if (!string.IsNullOrEmpty(datasetId))
+            {
+                embedToken = PowerBIToken.CreateReportEmbedTokenForCreation(workspaceCollectionName, workspaceId, datasetId, rlsUsername, roles, scopes);
+            }
+
+            var token = embedToken.Generate(accessKeys.Key1);
+            Console.WriteLine("Embed Token: {0}", token);
+                        
+            var copy = userInput.EnsureParam(null, "Copy embed token to clipboard? (Y)/(N) ");
+            if (copy.Equals("y", StringComparison.CurrentCultureIgnoreCase))
+            {
+                try
+                {
+                    // Save access token to Clipboard
+                    System.Windows.Forms.Clipboard.SetText(token);
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("Embed Token saved to clipboard.");
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Embed Token could not be saved to clipboard.");
+                    Console.WriteLine(ex.ToString());
+                }
+            }
+        }
+
+        /// <summary>
+        /// Print a list of reports to user.
+        /// </summary>
+        /// <param name="reports"></param>
+        /// <returns>True if reports exist, and false otherwise.</returns>
+        private static bool PrintReports(IList<Report> reports)
+        {
             if (reports == null || !reports.Any())
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("No report found in Workspace {0} from WorkspaceCollection {1}", workspaceId, workspaceCollectionName);
-                return;
+                return false;
             }
 
             Console.WriteLine("Existing reports:");
             for (int i = 0; i < reports.Count; i++)
-                ConsoleHelper.WriteColoredStringLine(string.Format("{0} report name:{1}, Id:{2}", i + 1, reports[i].Name, reports[i].Id), ConsoleColor.Green, 2);
-            Console.WriteLine();
-
-            index = userInput.EnsureIntParam(index, "Index of report to use (-1 for last in list)");
-            if (!index.HasValue)
             {
-                index = -1;
+                ConsoleHelper.WriteColoredStringLine(string.Format("{0} report name:{1}, Id:{2}", i + 1, reports[i].Name, reports[i].Id), ConsoleColor.Green, 2);
             }
-            if (!index.HasValue || index.Value <= 0 || index.Value > reports.Count)
-                index = reports.Count;
 
-            Report report = reports[index.Value - 1];
-            var embedToken = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, report.Id);
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("Embed Url: {0}", report.EmbedUrl);
-            Console.WriteLine("Embed Token: {0}", embedToken.Generate(accessKeys.Key1));
-            var embedToken2 = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, report.Id);
-            embedToken2.Claims.Add(new System.Security.Claims.Claim("type", "embed"));
-            Console.WriteLine("Fixed Token: {0}", embedToken2.Generate(accessKeys.Key1));
+            Console.WriteLine();
+            return true;
+        }
+
+        /// <summary>
+        /// Print a list of datasets to user.
+        /// </summary>
+        /// <param name="datasets"></param>
+        /// <returns>True if datasets exist, and false otherwise.</returns>
+        private static bool PrintDatasets(IList<Dataset> datasets)
+        {
+            if (datasets == null || !datasets.Any())
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("No datasets found in Workspace {0} from WorkspaceCollection {1}", workspaceId, workspaceCollectionName);
+                return false;
+            }
+
+            Console.WriteLine("Existing datasets:");
+            for (int i = 0; i < datasets.Count; i++)
+            {
+                ConsoleHelper.WriteColoredStringLine(string.Format("{0} dataset name:{1}, Id:{2}", i + 1, datasets[i].Name, datasets[i].Id), ConsoleColor.Green, 2);
+            }
+
+            Console.WriteLine();
+            return true;
         }
 
         static async Task GetBillingInfo()
@@ -447,6 +600,24 @@ namespace ProvisionSample
                         reportId,
                         rebindReportRequest);
             }
+        }
+
+        private static async Task DeleteReport()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
+            reportId = userInput.EnsureParam(reportId, "Report Id");
+
+            using (var client = await CreateClient())
+            {
+                await client.Reports.DeleteReportAsync(
+                        workspaceCollectionName,
+                        workspaceId,
+                        reportId);
+            }
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Report deleted successfully.");
+            reportId = null;
         }
 
         private static async Task CloneReport()
@@ -946,6 +1117,15 @@ namespace ProvisionSample
             {
                 var reports = await client.Reports.GetReportsAsync(workspaceCollectionName, workspaceId);
                 return reports.Value;
+            }
+        }
+
+        static async Task<IList<Dataset>> GetDatasets(string workspaceCollectionName, string workspaceId)
+        {
+            using (var client = await CreateClient())
+            {
+                var datasets = await client.Datasets.GetDatasetsAsync(workspaceCollectionName, workspaceId);
+                return datasets.Value;
             }
         }
     }
