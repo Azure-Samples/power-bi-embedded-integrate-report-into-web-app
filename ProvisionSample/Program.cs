@@ -733,10 +733,21 @@ namespace ProvisionSample
                                                 }
                                             }", Encoding.UTF8);
             }
-            else
+            else if (cloud == "cn")
             {
                 content = new StringContent(@"{
                                                 ""location"": ""chinanorth"",
+                                                ""tags"": {},
+                                                ""sku"": {
+                                                    ""name"": ""S1"",
+                                                    ""tier"": ""Standard""
+                                                }
+                                            }", Encoding.UTF8);
+            }
+            else
+            {
+                content = new StringContent(@"{
+                                                ""location"": ""germanycentral"",
                                                 ""tags"": {},
                                                 ""sku"": {
                                                     ""name"": ""S1"",

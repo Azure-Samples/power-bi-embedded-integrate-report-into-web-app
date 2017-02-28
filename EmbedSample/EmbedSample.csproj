@@ -187,6 +187,9 @@
     <Content Include="Views\Shared\Reports.cshtml" />
     <Content Include="Views\Dashboard\Report.cshtml" />
     <Content Include="scripts\powerbi.js.map" />
+    <Content Include="Cloud.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="Web.Debug.config">
       <DependentUpon>Web.config</DependentUpon>
     </None>

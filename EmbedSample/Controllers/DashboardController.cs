@@ -53,30 +53,14 @@ namespace paas_demo.Controllers
                 var reportsResponse = await client.Reports.GetReportsAsync(this.workspaceCollection, this.workspaceId);
                 var report = reportsResponse.Value.FirstOrDefault(r => r.Id == reportId);
                 var embedToken = PowerBIToken.CreateReportEmbedToken(this.workspaceCollection, this.workspaceId, report.Id);
-                var cloud = apiUrl.Split('.')[2];
-                embedToken.Audience = findAud(cloud);
 
                 var viewModel = new ReportViewModel
                 {
                     Report = report,
-                    AccessToken = embedToken.Generate(this.accessKey),
-                    Cloud = cloud
+                    AccessToken = embedToken.Generate(this.accessKey)
                 };
 
                 return View(viewModel);
-            }
-        }
-
-
-        private  string findAud(string cloud)
-        {
-            if (cloud == "cn")
-            {
-                return "https://analysis.chinacloudapi.cn/powerbi/api";
-            }
-            else
-            {
-                return "https://analysis.windows.net/powerbi/api";
             }
         }
 

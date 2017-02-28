@@ -10,7 +10,6 @@
 <div class="side-body padding-top">
     <div class="col-md-9">
         @Html.PowerBIReportFor(m => m.Report, new { id = "pbi-report", style = "height:85vh", powerbi_access_token = Model.AccessToken })
-        <div id="power_bi_cloud" power_bi_cloud="@Model.Cloud"></div>
     </div>
     <div class="col-md-3">
         <h3>Page Navigation</h3>
