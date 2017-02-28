@@ -359,7 +359,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var settings = utils.assign({}, Embed.defaultSettings, config.settings);
 	        this.config = utils.assign({ settings: settings }, config);
 	        this.config.accessToken = this.getAccessToken(service.accessToken);
-	        this.config.embedUrl = this.getEmbedUrl();
+	         = this.getEmbedUrl();
 	        this.config.id = this.getId();
 	        this.config.uniqueId = this.getUniqueId();
 	        this.config.embedUrl += '&unmin=1';
@@ -547,7 +547,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Embed.allowedEvents = ["loaded"];
 	    Embed.accessTokenAttribute = 'powerbi-access-token';
 	    Embed.embedUrlAttribute = 'powerbi-embed-url';
-	    Embed.cloudAttribute = 'power_bi_cloud';
 	    Embed.nameAttribute = 'powerbi-name';
 	    Embed.typeAttribute = 'powerbi-type';
 	    Embed.defaultSettings = {
