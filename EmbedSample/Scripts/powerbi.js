@@ -359,7 +359,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var settings = utils.assign({}, Embed.defaultSettings, config.settings);
 	        this.config = utils.assign({ settings: settings }, config);
 	        this.config.accessToken = this.getAccessToken(service.accessToken);
-	         = this.getEmbedUrl();
+	        this.config.embedUrl = this.getEmbedUrl();
 	        this.config.id = this.getId();
 	        this.config.uniqueId = this.getUniqueId();
 	        this.config.embedUrl += '&unmin=1';
