@@ -22,15 +22,17 @@ namespace ProvisionSample
 {
     partial class Program
     {
-        const string version = "?api-version=2016-01-29";
-        const string armResource = "https://management.core.windows.net/";
-        const string defaultRegion = "southcentralus";
 
+
+        static string defaultRegion = ConfigurationManager.AppSettings["defaultRegion"];
+        static string version = ConfigurationManager.AppSettings["apiVersion"];
+        static string armResource = ConfigurationManager.AppSettings["armResource"];
         static string apiEndpointUri = ConfigurationManager.AppSettings["powerBiApiEndpoint"];
         static string azureEndpointUri = ConfigurationManager.AppSettings["azureApiEndpoint"];
         static string defaultEmbedUrl = ConfigurationManager.AppSettings["defaultEmbedUrl"];
         static string subscriptionId = ConfigurationManager.AppSettings["subscriptionId"];
         static string resourceGroup = ConfigurationManager.AppSettings["resourceGroup"];
+
         static string workspaceCollectionName = ConfigurationManager.AppSettings["workspaceCollectionName"];
         static string username = ConfigurationManager.AppSettings["username"];
         static string password = ConfigurationManager.AppSettings["password"];

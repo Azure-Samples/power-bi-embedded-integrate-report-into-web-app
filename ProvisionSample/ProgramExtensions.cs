@@ -10,15 +10,18 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using System.Configuration;
 
 
 namespace ProvisionSample
 {
     partial class Program
     {
-        static string clientId = "ea0616ba-638b-4df5-95b9-636659ae5121";
+        static string clientId = ConfigurationManager.AppSettings["clientId"];
         static Uri redirectUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
         static string azureToken = null;
+        static string tenantsUrl = ConfigurationManager.AppSettings["tenantsUrl"];
+        static string authUrl = ConfigurationManager.AppSettings["AuthenticationUrl"];
 
         private static HttpClient CreateHttpClient()
         {
@@ -71,7 +74,7 @@ namespace ProvisionSample
             using (var httpClient = CreateHttpClient())
             {
                 httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + commonToken);
-                var response = await httpClient.GetStringAsync("https://management.azure.com/tenants?api-version=2016-01-29");
+                var response = await httpClient.GetStringAsync(tenantsUrl);
                 var tenantsJson = JsonConvert.DeserializeObject<JObject>(response);
                 var tenants = tenantsJson["value"] as JArray;
 
@@ -98,7 +101,7 @@ namespace ProvisionSample
                 throw new InvalidOperationException("Unable to get tenant id for user accout");
             }
 
-            var authority = string.Format("https://login.windows.net/{0}/oauth2/authorize", tenantId);
+            var authority = string.Format("{0}/{1}/oauth2/authorize", authUrl, tenantId);
             var authContext = new AuthenticationContext(authority);
             var result = await authContext.AcquireTokenByRefreshTokenAsync(commonToken.RefreshToken, clientId, armResource);
 
@@ -112,7 +115,7 @@ namespace ProvisionSample
         /// <returns></returns>
         static AuthenticationResult GetCommonAzureAccessToken()
         {
-            var authContext = new AuthenticationContext("https://login.windows.net/common/oauth2/authorize");
+            var authContext = new AuthenticationContext(string.Format("{0}/common/oauth2/authorize", authUrl));
             var result = authContext.AcquireToken(
                 resource: armResource,
                 clientId: clientId,
