@@ -99,7 +99,6 @@ namespace ProvisionSample
             commands.RegisterCommand("Datasets: Get all datasets", ListDatasetsInWorkspace);
             commands.RegisterCommand("Datasets: Create from Analysis Services", CreateASDataset);
             commands.RegisterCommand("Datasets: Update the Connection String (Cloud only)", UpdateConnetionString);
-            commands.RegisterCommand("Datasets: Update the Connection Credentials (Cloud only)", UpdateConnetionCredentials);
             commands.RegisterCommand("Datasets: Delete a dataset", DeleteDataset);
             commands.RegisterCommand("Reports : Get all reports", ListReportsInWorkspace);
             commands.RegisterCommand("Reports : Clone report", CloneReport);
