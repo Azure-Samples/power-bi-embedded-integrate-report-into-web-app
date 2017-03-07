@@ -1232,3 +1232,12 @@ body.login-page {
   .featurette-heading {
     margin-top: 100px;
     margin-bottom: 20px; } }
+
+.livesamplelink {
+    margin-top: 20px;
+    font-size: 120%;
+}
+
+.livesamplelink a {
+    color: rgb(250, 42, 0) !important;
+}
