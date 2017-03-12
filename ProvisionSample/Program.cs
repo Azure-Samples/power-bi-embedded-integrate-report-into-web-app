@@ -436,14 +436,16 @@ namespace ProvisionSample
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Embed Url: {0}", embedUrl);
 
+            TimeSpan expiry = new TimeSpan(24, 0, 0);
+
             PowerBIToken embedToken = null;
             if (!string.IsNullOrEmpty(reportId))
             {
-                embedToken = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, reportId, rlsUsername, roles, scopes);
+                embedToken = PowerBIToken.CreateReportEmbedToken(workspaceCollectionName, workspaceId, reportId,expiry, rlsUsername, roles, scopes);
             }
             else if (!string.IsNullOrEmpty(datasetId))
             {
-                embedToken = PowerBIToken.CreateReportEmbedTokenForCreation(workspaceCollectionName, workspaceId, datasetId, rlsUsername, roles, scopes);
+                embedToken = PowerBIToken.CreateReportEmbedTokenForCreation(workspaceCollectionName, workspaceId, datasetId,expiry, rlsUsername, roles, scopes);
             }
 
             var token = embedToken.Generate(accessKeys.Key1);
