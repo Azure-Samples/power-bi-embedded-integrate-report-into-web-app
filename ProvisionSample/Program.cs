@@ -22,15 +22,15 @@ namespace ProvisionSample
 {
     partial class Program
     {
-        const string version = "?api-version=2016-01-29";
-        const string armResource = "https://management.core.windows.net/";
-        const string defaultRegion = "southcentralus";
-
+        static string defaultRegion = ConfigurationManager.AppSettings["defaultRegion"];
+        static string version = ConfigurationManager.AppSettings["apiVersion"];
+        static string armResource = ConfigurationManager.AppSettings["armResource"];
         static string apiEndpointUri = ConfigurationManager.AppSettings["powerBiApiEndpoint"];
         static string azureEndpointUri = ConfigurationManager.AppSettings["azureApiEndpoint"];
         static string defaultEmbedUrl = ConfigurationManager.AppSettings["defaultEmbedUrl"];
         static string subscriptionId = ConfigurationManager.AppSettings["subscriptionId"];
         static string resourceGroup = ConfigurationManager.AppSettings["resourceGroup"];
+
         static string workspaceCollectionName = ConfigurationManager.AppSettings["workspaceCollectionName"];
         static string username = ConfigurationManager.AppSettings["username"];
         static string password = ConfigurationManager.AppSettings["password"];
@@ -96,18 +96,17 @@ namespace ProvisionSample
             groups.AddGroup("Collection management", commands);
 
             commands = new Commands();
-            commands.RegisterCommand("Datasets: Get all datasets", ListDatasetsInWorkspace);
-            commands.RegisterCommand("Datasets: Create from Analysis Services", CreateASDataset);
-            commands.RegisterCommand("Datasets: Update the Connection String (Cloud only)", UpdateConnetionString);
-            commands.RegisterCommand("Datasets: Update the Connection Credentials (Cloud only)", UpdateConnetionCredentials);
-            commands.RegisterCommand("Datasets: Delete a dataset", DeleteDataset);
-            commands.RegisterCommand("Reports : Get all reports", ListReportsInWorkspace);
-            commands.RegisterCommand("Reports : Clone report", CloneReport);
-            commands.RegisterCommand("Reports : Rebind report to another dataset", RebindReport);
-            commands.RegisterCommand("Reports : Generate embed details", GetEmbedInfo);
-            commands.RegisterCommand("Reports : Delete a report", DeleteReport);
-            commands.RegisterCommand("Imports : Import PBIX Desktop file into a workspace", ImportPBIX);
-            commands.RegisterCommand("Imports : Get status of PBIX", GetImportStatus);
+            commands.RegisterCommand("Get Datasets in a workspace", ListDatasetsInWorkspace);
+            commands.RegisterCommand("Get Reports in a workspace", ListReportsInWorkspace);
+            commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
+            commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
+            commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
+            commands.RegisterCommand("Update the Connection String (Cloud only)", UpdateConnetionString);
+            commands.RegisterCommand("Update the Connection Credentials (Cloud only)", UpdateConnetionCredentials);
+            commands.RegisterCommand("Generate embed details", GetEmbedInfo);
+            commands.RegisterCommand("Clone report", CloneReport);
+            commands.RegisterCommand("Rebind report to another dataset", RebindReport);
+            commands.RegisterCommand("Delete report", DeleteReport);
             groups.AddGroup("Report management", commands);
 
             commands = new Commands();
@@ -607,43 +606,6 @@ namespace ProvisionSample
             }
 
             datasetId = datasets.Last().Id;
-        }
-
-        private static async Task CreateASDataset()
-        {
-            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
-
-            var datasetName = userInput.EnsureParam(null, "Dataset name");
-            var dataSourceName = userInput.EnsureParam(null, "Data Source name");
-
-            Console.WriteLine("Connection String must be in this format: Data Source=<datasource>;Initial Catalog=<catalog>;Cube=<cube of model>");
-            var connectionString = userInput.EnsureParam(null, "Connection String");
-            
-            // Create sample dataset object with AsAzure mode.
-            var dataset = new Dataset
-            {
-                Name = datasetName,
-                Tables = new List<Microsoft.PowerBI.Api.V1.Models.Table>(),
-                DefaultMode = "AsAzure"
-            };
-
-            // Add datasource with sample connection string.
-            var datasources = new List<Datasource>();
-            datasources.Add(new Datasource()
-            {
-                Name = dataSourceName,
-                ConnectionString = connectionString
-            });
-
-            dataset.Datasources = datasources;
-
-            using (var client = await CreateClient())
-            {
-                await client.Datasets.PostDatasetAsync(
-                        workspaceCollectionName,
-                        workspaceId,
-                        dataset);
-            }
         }
 
         static async Task ListReportsInWorkspace()
