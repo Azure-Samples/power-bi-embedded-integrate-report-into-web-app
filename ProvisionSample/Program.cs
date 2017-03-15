@@ -1,4 +1,4 @@
-using ApiHost.Models;
+﻿using ApiHost.Models;
 using Microsoft.PowerBI.Api.V1;
 using Microsoft.PowerBI.Api.V1.Models;
 using Microsoft.PowerBI.Security;
@@ -22,8 +22,6 @@ namespace ProvisionSample
 {
     partial class Program
     {
-
-
         static string defaultRegion = ConfigurationManager.AppSettings["defaultRegion"];
         static string version = ConfigurationManager.AppSettings["apiVersion"];
         static string armResource = ConfigurationManager.AppSettings["armResource"];
@@ -44,6 +42,8 @@ namespace ProvisionSample
 
         static string collectionLocation = defaultRegion;
         static Groups groups = new Groups();
+        static Commands flatCommands = new Commands();
+        static bool flatDisplay = false;
         static WorkspaceCollectionKeys accessKeys = null;
         static UserInput userInput = null;
 
@@ -101,7 +101,8 @@ namespace ProvisionSample
             commands.RegisterCommand("Import PBIX Desktop file into a workspace", ImportPBIX);
             commands.RegisterCommand("Get status of PBIX import", GetImportStatus);
             commands.RegisterCommand("Delete an imported Dataset", DeleteDataset);
-            commands.RegisterCommand("Update a Connection String for a dataset (Cloud only)", UpdateConnetionString);
+            commands.RegisterCommand("Update the Connection String (Cloud only)", UpdateConnetionString);
+            commands.RegisterCommand("Update the Connection Credentials (Cloud only)", UpdateConnetionCredentials);
             commands.RegisterCommand("Generate embed details", GetEmbedInfo);
             commands.RegisterCommand("Clone report", CloneReport);
             commands.RegisterCommand("Rebind report to another dataset", RebindReport);
@@ -117,8 +118,10 @@ namespace ProvisionSample
             commands.RegisterCommand("Display Settings", ShowCachedMetadata);
             commands.RegisterCommand("Manage Settings", () => ManageCachedMetadata(forceReset: false));
             commands.RegisterCommand("Clear Settings", () => ManageCachedMetadata(forceReset: true));
+            commands.RegisterCommand("Toggle display mode",  ToggleFlatDisplay);
             commands.RegisterCommand("Exit", Exit);
             groups.AddGroup("Settings", commands);
+            flatCommands = groups.ToFlatCommands();
         }
 
         static async Task<bool> Run()
@@ -126,7 +129,10 @@ namespace ProvisionSample
             Console.ResetColor();
             try
             {
-                ConsoleHelper.PrintCommands(groups);
+                if (!flatDisplay)
+                    ConsoleHelper.PrintCommands(groups);
+                else
+                    ConsoleHelper.PrintCommands(flatCommands);
 
                 int? numericCommand;
                 bool switchGroup;
@@ -137,7 +143,7 @@ namespace ProvisionSample
                     Func<Task> operation = null;
                     if (index >= 0)
                     {
-                        operation = groups.GetCommand(switchGroup, index);
+                        operation = flatDisplay ? flatCommands .GetCommand(index) : groups.GetCommand(switchGroup, index);
                     }
 
                     if (operation != null)
@@ -163,6 +169,10 @@ namespace ProvisionSample
                     if (error.Error.Details != null && error.Error.Details.FirstOrDefault() != null)
                     {
                         Console.WriteLine(error.Error.Details.FirstOrDefault().Message);
+                    }
+                    else if (error.Error.Message != null)
+                    {
+                        Console.WriteLine(error.Error.Message);
                     }
                     else if (error.Error.Code != null)
                     {
@@ -256,6 +266,10 @@ namespace ProvisionSample
             {
                 workspaceCollectionName = workspaceCollections.Last().Name;
             }
+            else
+            {
+                Console.WriteLine("No Workspace Collections found");
+            }
         }
 
         static async Task GetWorkspaceCollectionMetadata()
@@ -293,6 +307,10 @@ namespace ProvisionSample
             {
                 workspaceId = workspaces.Last().WorkspaceId;
             }
+            else
+            {
+                Console.WriteLine("No workspaces found in collection {0}", workspaceCollectionName);
+            }
         }
 
         static async Task ProvisionNewWorkspace()
@@ -329,10 +347,42 @@ namespace ProvisionSample
         static async Task UpdateConnetionString()
         {
             EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
-			
-            await UpdateConnection(workspaceCollectionName, workspaceId, datasetId);
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("Connection information updated successfully.");
+            string connectionString = userInput.EnsureParam(null, "Connection String", onlyFillIfEmpty: false);
+
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                await UpdateConnectionString(workspaceCollectionName, workspaceId, datasetId, connectionString);
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("Connection string information updated successfully.");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("Empty Connection string. Request ignored");
+            }
+        }
+
+        static async Task UpdateConnetionCredentials()
+        {
+            EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId | EnsureExtras.DatasetId, forceEntering: EnsureExtras.DatasetId);
+            var chachedUsername = username;
+            username = userInput.EnsureParam(username, "Username", onlyFillIfEmpty: false);
+            if (username != chachedUsername)
+            {
+                password = userInput.EnsureParam(null, "Password", onlyFillIfEmpty: false, isPassword: true);
+            }
+
+            if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
+            {
+                var executionReport = await UpdateConnectionCredentials(workspaceCollectionName, workspaceId, datasetId, username, password);
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine(executionReport.ToString());
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("Connection credentials not updated (Empty data entered).");
+            }
         }
 
         static async Task GetEmbedInfo()
@@ -746,6 +796,14 @@ namespace ProvisionSample
             });
         }
 
+        static Task ToggleFlatDisplay()
+        {
+            return Task.Run(() =>
+            {
+                flatDisplay = !flatDisplay;
+            });
+        }
+
         static Task Exit()
         {
             return Task.Run(() =>
@@ -929,6 +987,7 @@ namespace ProvisionSample
             {
                 request = new CreateWorkspaceRequest(workspaceName);
             }
+
             using (var client = await CreateClient())
             {
                 // Create a new workspace witin the specified collection
@@ -1051,29 +1110,30 @@ namespace ProvisionSample
         /// <param name="workspaceId">The Power BI workspace id that contains the dataset</param>
         /// <param name="datasetId">The Power BI dataset to update connection for</param>
         /// <returns></returns>
-        static async Task UpdateConnection(string workspaceCollectionName, string workspaceId, string datasetId)
+        static async Task UpdateConnectionString(string workspaceCollectionName, string workspaceId, string datasetId, string connectionString)
         {
-            var chachedUsername = username;
-            username = userInput.EnsureParam(username, "Username", onlyFillIfEmpty: false);
-            if (username != chachedUsername)
-            {
-                password = userInput.EnsureParam(null, "Password", onlyFillIfEmpty: false, isPassword: true);
-            }
-
-            string connectionString = userInput.EnterOptionalParam("Connection String", "leave empty");
-
             using (var client = await CreateClient())
             {
-                // Optionally udpate the connectionstring details if preent
-                if (!string.IsNullOrWhiteSpace(connectionString))
+                var connectionParameters = new Dictionary<string, object>
                 {
-                    var connectionParameters = new Dictionary<string, object>
-                    {
-                        { "connectionString", connectionString }
-                    };
-                    await client.Datasets.SetAllConnectionsAsync(workspaceCollectionName, workspaceId, datasetId, connectionParameters);
-                }
+                    { "connectionString", connectionString }
+                };
 
+                await client.Datasets.SetAllConnectionsAsync(workspaceCollectionName, workspaceId, datasetId, connectionParameters);
+            }
+        }
+
+        /// <summary>
+        /// Updates the Power BI dataset connection credentials for datasets with direct query connections
+        /// </summary>
+        /// <param name="workspaceCollectionName">The Power BI workspace collection name</param>
+        /// <param name="workspaceId">The Power BI workspace id that contains the dataset</param>
+        /// <param name="datasetId">The Power BI dataset to update connection for</param>
+        /// <returns></returns>
+        static async Task<ExecutionReport> UpdateConnectionCredentials(string workspaceCollectionName, string workspaceId, string datasetId, string username, string password)
+        {
+            using (var client = await CreateClient())
+            {
                 // Get the datasources from the dataset
                 var datasources = await client.Datasets.GetGatewayDatasourcesAsync(workspaceCollectionName, workspaceId, datasetId);
 
@@ -1088,13 +1148,21 @@ namespace ProvisionSample
                     }
                 };
 
-                if (datasources.Value.Count != 1)
+                ExecutionReport report = null;
+                switch (datasources.Value.Count)
                 {
-                    Console.Write("Expected one datasource, updating the first");
+                    case 0: return new ExecutionReport(ExecutionLevel.Error, "No datasources exist to update");
+                    case 1:
+                        report = new ExecutionReport(ExecutionLevel.OK, "Connection credentials updated successfully.");
+                        break;
+                    default:
+                        report = new ExecutionReport(ExecutionLevel.Warning, string.Format("Expected one datasource, but {0} exist, Connection credentials updated for the first", datasources.Value.Count));
+                        break;
                 }
 
                 // Update the datasource with the specified credentials
                 await client.Gateways.PatchDatasourceAsync(workspaceCollectionName, workspaceId, datasources.Value[0].GatewayId, datasources.Value[0].Id, delta);
+                return report;
             }
         }
 
