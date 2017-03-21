@@ -112,6 +112,8 @@ namespace ProvisionSample
             commands = new Commands();
             commands.RegisterCommand("Get billing info", GetBillingInfo);
             commands.RegisterCommand("Generate Push Json from PBI Desktop Template", GetPushFromTemplate);
+            commands.RegisterCommand("Create WSs", CreateWSs);
+
             groups.AddGroup("Misc.", commands);
 
             commands = new Commands();
@@ -248,6 +250,146 @@ namespace ProvisionSample
             accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, workspaceCollectionName);
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Workspace collection created successfully");
+        }
+
+        static async Task CreateWSs()
+        {
+            var id = Guid.NewGuid().ToString().Substring(0, 5);
+            var wcs = new List<Tuple<string, WorkspaceCollectionKeys>>();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            for (int i = 0; i < 13; i++)
+            {
+                var name = string.Format("CGWTest-{0}-{1}", id, i+1);
+                await CreateWorkspaceCollection(subscriptionId, resourceGroup, name, collectionLocation);
+                var accessKeys = await ListWorkspaceCollectionKeys(subscriptionId, resourceGroup, name);
+                wcs.Add(new Tuple<string, WorkspaceCollectionKeys>(name, accessKeys));
+                Console.WriteLine("Workspace collection created successfully");
+            }
+
+            var wss = new List<Workspace>();
+            foreach (var tuple in wcs)
+            {
+                accessKeys = tuple.Item2;
+                wss.Add(await CreateWorkspace(tuple.Item1, "WS-A"));
+                wss.Add(await CreateWorkspace(tuple.Item1, "WS-B"));
+                await ChangeDMTSOwnership("DontForceWsOwnership", tuple.Item1);
+            }
+            Console.WriteLine("Workspaces created successfully");
+            
+            //add reports
+            //WSC2
+            await UploadReport(wcs[1], wss[3], false);
+
+            //WSC3
+            await UploadReport(wcs[2], wss[4], true);
+
+            //WSC4
+            await UploadReport(wcs[3], wss[7], false);
+
+            //WSC6
+            await UploadReport(wcs[5], wss[10], false);
+
+            //WSC8
+            await UploadReport(wcs[7], wss[14], true);
+            await UploadReport(wcs[7], wss[15], true);
+
+            //WSC9
+            await UploadReport(wcs[8], wss[16], true);
+
+            //WSC10
+            await UploadReport(wcs[9], wss[18], false);
+
+            //WSC11
+            await UploadReport(wcs[10], wss[20], true);
+
+            //WSC12
+            await UploadReport(wcs[11], wss[22], true);
+
+            //WSC13
+            await UploadReport(wcs[12], wss[24], false);
+
+            Console.WriteLine("Reports uploaded successfully");
+            foreach (var tuple in wcs)
+            {
+                accessKeys = tuple.Item2;
+                await ChangeDMTSOwnership("ForceWsOwnershipManual", tuple.Item1);
+            }
+            Console.WriteLine("DMTS ownership changed");
+
+            // upload more reports
+            
+            //WSC1
+            await UploadReport(wcs[0], wss[0], true);
+
+            //WSC2
+            await UploadReport(wcs[1], wss[2], true);
+
+            //WSC4
+            await UploadReport(wcs[3], wss[6], true);
+
+            //WSC5
+            await UploadReport(wcs[4], wss[8], true);
+            await UploadReport(wcs[4], wss[8], true);
+
+            //WSC6
+            await UploadReport(wcs[5], wss[10], true);
+
+            //WSC7
+            await UploadReport(wcs[6], wss[12], true);
+            await UploadReport(wcs[6], wss[13], true);
+            
+            //WSC9
+            await UploadReport(wcs[8], wss[17], false);
+            
+            //WSC10
+            await UploadReport(wcs[9], wss[19], true);
+
+            //WSC12
+            await UploadReport(wcs[11], wss[22], false);
+
+            //WSC13
+            await UploadReport(wcs[12], wss[25], true);
+
+            foreach (var tuple in wcs.Skip(wcs.Count - 3))
+            {
+                accessKeys = tuple.Item2;
+                await ChangeDMTSOwnership("DontForceWsOwnership ", tuple.Item1);
+            }
+        }
+
+        private static async Task UploadReport(Tuple<string, WorkspaceCollectionKeys> wc, Workspace ws, bool good)
+        {
+            const string filePath = @"\\pa-storage\Public\PaaSData\UserBasedView_DQ_SQL_Azure.pbix";
+            accessKeys = wc.Item2;
+
+            var datasetName = good ? "Good" : "Bad";
+            datasetName += Guid.NewGuid().ToString().Substring(0,5);
+            await ImportPbix(wc.Item1, ws.WorkspaceId, datasetName, filePath);
+            var ds = await GetDatasets(wc.Item1, ws.WorkspaceId);
+            var executionReport = await UpdateConnectionCredentials(wc.Item1, ws.WorkspaceId, ds.First(d => d.Name == datasetName).Id, good ? "user1" : "refresh", "Pa$$word1");
+        }
+
+        async static Task<HttpResponseMessage> ChangeDMTSOwnership(string ownershipMode, string wcName)
+        {
+            using (var client = await CreateClient())
+            {
+                var url = string.Format("{0}/v1.0/collections/{1}/SetDMTSOwnershipMode",
+                    apiEndpointUri,
+                    wcName);
+
+                // Create HTTP transport objects
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                string _requestContent = SafeJsonConvert.SerializeObject(new { mode = ownershipMode });
+                request.Content = new StringContent(_requestContent, Encoding.UTF8, "application/json");
+                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=utf-8");
+                if (client.Credentials != null)
+                {
+                    await client.Credentials.ProcessHttpRequestAsync(request, CancellationToken.None).ConfigureAwait(false);
+                }
+                var response = await client.HttpClient.SendAsync(request);
+
+                return response;
+            }
         }
 
         static async Task ListWorkspaceCollections()
