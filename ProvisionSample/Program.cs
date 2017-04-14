@@ -336,8 +336,8 @@ namespace ProvisionSample
         static async Task ImportPBIX()
         {
             EnsureBasicParams(EnsureExtras.WorkspaceCollection | EnsureExtras.WorspaceId);
-            var datasetName = userInput.EnsureParam(null, "Dataset Name");
-            var filePath = userInput.EnsureParam(null, "File Path");
+            var datasetName = userInput.EnsureParam(null, "Dataset Name. Not to be confused with your pbix file name");
+            var filePath = userInput.EnsureParam(null, "File Path, for example C:\Documents\work\myfile.pbix");
 
             var import = await ImportPbix(workspaceCollectionName, workspaceId, datasetName, filePath);
             Console.ForegroundColor = ConsoleColor.Cyan;
