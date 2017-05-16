@@ -30,6 +30,10 @@
                 </label>
             </div>
         </div>
+        <div class="form-group">
+            <label for="dataselected-value">Data Selected</label>
+            <input type="text" class="form-control" id="dataselected-value" />
+        </div> 
         <h3>Filters</h3>
         <button id="filter-clear" type="button" class="btn btn-danger">Clear All Filters</button>
         <h4>Add Filter</h4>
@@ -116,6 +120,16 @@
                     pageIndex = pages.findIndex(function (el) {
                         return el.name === e.detail.newPage.name;
                     });
+                });
+
+            // For a complete guide to page navigation see the following wiki page
+            // https://github.com/Microsoft/PowerBI-JavaScript/wiki/Handling-Events
+            report.on('dataSelected',
+                function (event) {
+                    var data = event.detail;
+                    var dataString = JSON.stringify(event.detail);
+                    var resultsJSON = JSON.parse(dataString);
+                    $("#dataselected-value").val(resultsJSON.dataPoints[0].identity[0].equals + " = " + resultsJSON.dataPoints[0].values[0].formattedValue);
                 });
 
             // For a complete guide to page navigation see the following wiki page
